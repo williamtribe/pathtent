@@ -208,10 +208,10 @@ async def test_kipris_client_get_pdf_info__if_pdf_exists__returns_pdf_info() -> 
         <resultMsg>NORMAL SERVICE.</resultMsg>
     </header>
     <body>
-        <Item>
+        <item>
             <docName>1020240054471.pdf</docName>
             <path>http://plus.kipris.or.kr/openapi/fileToss.jsp?arg=abc123</path>
-        </Item>
+        </item>
     </body>
 </response>"""
 

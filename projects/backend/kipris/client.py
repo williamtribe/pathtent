@@ -61,7 +61,7 @@ class KIPRISClient:
         response.raise_for_status()
 
         root = ET.fromstring(response.text)
-        item = root.find(".//Item")
+        item = root.find(".//item")
 
         if item is None:
             return None
@@ -97,7 +97,7 @@ class KIPRISClient:
         response.raise_for_status()
 
         root = ET.fromstring(response.text)
-        item = root.find(".//Item")
+        item = root.find(".//item")
 
         if item is None:
             return None
