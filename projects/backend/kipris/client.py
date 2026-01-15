@@ -1,10 +1,11 @@
 import xml.etree.ElementTree as ET
+from pathlib import Path
 from types import TracebackType
 from typing import Self
 
 import httpx
 
-from kipris.models import PatentSearchResult, SearchParams
+from kipris.models import PatentSearchResult, PDFInfo, SearchParams
 
 
 class KIPRISClient:
@@ -48,3 +49,63 @@ class KIPRISClient:
             results.append(result)
 
         return results
+
+    async def get_publication_pdf_info(self, application_number: str) -> PDFInfo | None:
+        query_params = {
+            "applicationNumber": application_number,
+            "ServiceKey": self._service_key,
+        }
+
+        url = f"{self._base_url}/getPubFullTextInfoSearch"
+        response = await self._client.get(url, params=query_params)
+        response.raise_for_status()
+
+        root = ET.fromstring(response.text)
+        item = root.find(".//Item")
+
+        if item is None:
+            return None
+
+        doc_name = item.findtext("docName")
+        path = item.findtext("path")
+
+        if not doc_name or not path:
+            return None
+
+        return PDFInfo(docName=doc_name, path=path)
+
+    async def download_pdf(self, pdf_path: str, save_path: Path) -> Path:
+        async with self._client.stream("GET", pdf_path) as response:
+            response.raise_for_status()
+
+            save_path.parent.mkdir(parents=True, exist_ok=True)
+
+            with save_path.open("wb") as f:
+                async for chunk in response.aiter_bytes():
+                    f.write(chunk)
+
+        return save_path
+
+    async def get_announcement_pdf_info(self, application_number: str) -> PDFInfo | None:
+        query_params = {
+            "applicationNumber": application_number,
+            "ServiceKey": self._service_key,
+        }
+
+        url = f"{self._base_url}/getAnnFullTextInfoSearch"
+        response = await self._client.get(url, params=query_params)
+        response.raise_for_status()
+
+        root = ET.fromstring(response.text)
+        item = root.find(".//Item")
+
+        if item is None:
+            return None
+
+        doc_name = item.findtext("docName")
+        path = item.findtext("path")
+
+        if not doc_name or not path:
+            return None
+
+        return PDFInfo(docName=doc_name, path=path)
