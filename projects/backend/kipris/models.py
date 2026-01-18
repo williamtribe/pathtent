@@ -32,6 +32,8 @@ class SearchParams(BaseModel):
     last_value: Literal["", "A", "C", "F", "G", "I", "J", "R"] | None = Field(None, alias="lastvalue")
     page_no: int | None = Field(None, alias="pageNo")
     num_of_rows: int | None = Field(None, alias="numOfRows")
+    docs_start: int | None = Field(None, alias="docsStart")
+    docs_count: int | None = Field(None, alias="docsCount")
     sort_spec: Literal["PD", "AD", "GD", "OPD", "FD", "FOD", "RD"] | None = Field(None, alias="sortSpec")
     desc_sort: bool | None = Field(None, alias="descSort")
 
