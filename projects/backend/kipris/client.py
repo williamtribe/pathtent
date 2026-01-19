@@ -3,7 +3,7 @@ import random
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from types import TracebackType
-from typing import Self
+from typing import Any, Self
 from urllib.parse import urlparse
 
 import httpx
@@ -102,7 +102,7 @@ class KIPRISClient:
 
         await asyncio.sleep(retry_after)
 
-    async def _request(self, method: str, url: str, **kwargs: object) -> httpx.Response:
+    async def _request(self, method: str, url: str, **kwargs: Any) -> httpx.Response:
         response = None
         for attempt in range(self._max_retries + 1):
             try:
@@ -145,7 +145,7 @@ class KIPRISClient:
         prefix: str,
         endpoint: str,
         base_urls: list[str],
-        **kwargs: object,
+        **kwargs: Any,
     ) -> httpx.Response:
         last_response = None
         for index, base_url in enumerate(base_urls):
