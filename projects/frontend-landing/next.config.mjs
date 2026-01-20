@@ -1,11 +1,5 @@
-import type { NextConfig } from 'next'
 import createNextIntlPlugin from 'next-intl/plugin'
 import withSerwistInit from '@serwist/next'
-import { fileURLToPath } from 'node:url'
-import { dirname } from 'node:path'
-
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = dirname(__filename)
 
 const withNextIntl = createNextIntlPlugin('./i18n/request.ts')
 
@@ -16,10 +10,6 @@ const withSerwist = withSerwistInit({
   reloadOnOnline: false,
 })
 
-const nextConfig: NextConfig = {
-  turbopack: {
-    root: __dirname,
-  },
-}
+const nextConfig = {}
 
 export default withNextIntl(withSerwist(nextConfig))
