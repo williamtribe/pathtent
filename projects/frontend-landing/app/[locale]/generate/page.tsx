@@ -11,13 +11,13 @@ import {
   Check,
   Sparkles
 } from 'lucide-react'
-import { 
-  analyzeDocument, 
+import {
+  analyzeDocument,
   generateSpecification,
   type Question,
   type PatentSpecification,
-  type Answer
-} from '@/lib/api'
+  type Answer,
+} from '../../../lib/api'
 
 type Step = 'input' | 'questions' | 'generating' | 'result'
 
