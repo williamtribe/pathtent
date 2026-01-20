@@ -106,33 +106,33 @@ async def test_kipris_client_search__if_valid_response__returns_list() -> None:
     xml_response = """<?xml version="1.0" encoding="UTF-8"?>
 <response>
     <header>
-        <resultCode></resultCode>
-        <resultMsg></resultMsg>
+        <resultCode>00</resultCode>
+        <resultMsg>NORMAL SERVICE.</resultMsg>
     </header>
     <body>
         <items>
-            <PatentUtilityInfo>
-                <SerialNumber>1</SerialNumber>
-                <RegistrationStatus>공개</RegistrationStatus>
-                <InventionName>과산화효소 관련 바이오센서</InventionName>
-                <InternationalpatentclassificationNumber>C01B 32/15</InternationalpatentclassificationNumber>
-                <ApplicationNumber>1020240054471</ApplicationNumber>
-                <ApplicationDate>2024-04-24</ApplicationDate>
-                <OpeningNumber>1020250155726</OpeningNumber>
-                <OpeningDate>2025-10-31</OpeningDate>
-                <Applicant>가천대학교 산학협력단</Applicant>
-            </PatentUtilityInfo>
-            <PatentUtilityInfo>
-                <SerialNumber>2</SerialNumber>
-                <RegistrationStatus>공개</RegistrationStatus>
-                <InventionName>외장형 부분 방전 진단 센서</InventionName>
-                <InternationalpatentclassificationNumber>G01R 31/12</InternationalpatentclassificationNumber>
-                <ApplicationNumber>1020240083601</ApplicationNumber>
-                <ApplicationDate>2024-06-26</ApplicationDate>
-                <OpeningNumber>1020260000821</OpeningNumber>
-                <OpeningDate>2026-01-05</OpeningDate>
-                <Applicant>한국전력공사</Applicant>
-            </PatentUtilityInfo>
+            <item>
+                <indexNo>1</indexNo>
+                <registerStatus>공개</registerStatus>
+                <inventionTitle>과산화효소 관련 바이오센서</inventionTitle>
+                <ipcNumber>C01B 32/15</ipcNumber>
+                <applicationNumber>1020240054471</applicationNumber>
+                <applicationDate>2024-04-24</applicationDate>
+                <openNumber>1020250155726</openNumber>
+                <openDate>2025-10-31</openDate>
+                <applicantName>가천대학교 산학협력단</applicantName>
+            </item>
+            <item>
+                <indexNo>2</indexNo>
+                <registerStatus>공개</registerStatus>
+                <inventionTitle>외장형 부분 방전 진단 센서</inventionTitle>
+                <ipcNumber>G01R 31/12</ipcNumber>
+                <applicationNumber>1020240083601</applicationNumber>
+                <applicationDate>2024-06-26</applicationDate>
+                <openNumber>1020260000821</openNumber>
+                <openDate>2026-01-05</openDate>
+                <applicantName>한국전력공사</applicantName>
+            </item>
         </items>
     </body>
 </response>"""
@@ -142,7 +142,7 @@ async def test_kipris_client_search__if_valid_response__returns_list() -> None:
     mock_response.raise_for_status = Mock()
 
     mock_client = AsyncMock()
-    mock_client.request.return_value = mock_response
+    mock_client.get.return_value = mock_response
 
     client = KIPRISClient("test-key")
     client._client = mock_client
@@ -170,8 +170,8 @@ async def test_kipris_client_search__if_empty_response__returns_empty_list() -> 
     xml_response = """<?xml version="1.0" encoding="UTF-8"?>
 <response>
     <header>
-        <resultCode></resultCode>
-        <resultMsg></resultMsg>
+        <resultCode>00</resultCode>
+        <resultMsg>NORMAL SERVICE.</resultMsg>
     </header>
     <body>
         <items></items>
@@ -183,7 +183,7 @@ async def test_kipris_client_search__if_empty_response__returns_empty_list() -> 
     mock_response.raise_for_status = Mock()
 
     mock_client = AsyncMock()
-    mock_client.request.return_value = mock_response
+    mock_client.get.return_value = mock_response
 
     client = KIPRISClient("test-key")
     client._client = mock_client
@@ -220,7 +220,7 @@ async def test_kipris_client_get_pdf_info__if_pdf_exists__returns_pdf_info() -> 
     mock_response.raise_for_status = Mock()
 
     mock_client = AsyncMock()
-    mock_client.request.return_value = mock_response
+    mock_client.get.return_value = mock_response
 
     client = KIPRISClient("test-key")
     client._client = mock_client
@@ -254,7 +254,7 @@ async def test_kipris_client_get_pdf_info__if_no_pdf__returns_none() -> None:
     mock_response.raise_for_status = Mock()
 
     mock_client = AsyncMock()
-    mock_client.request.return_value = mock_response
+    mock_client.get.return_value = mock_response
 
     client = KIPRISClient("test-key")
     client._client = mock_client

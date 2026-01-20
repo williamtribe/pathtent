@@ -1,0 +1,43 @@
+{
+  "home": {
+    "hero": {
+      "title": "Patent Similarity Search, Solved by AI",
+      "subtitle": "Discover similar patents instantly with KIPRIS API & Gemini AI. Precision search for professionals.",
+      "cta": "Start Now"
+    },
+    "howItWorks": {
+      "title": "How It Works",
+      "step1": {
+        "title": "Input Description",
+        "desc": "Paste your technical abstract or document."
+      },
+      "step2": {
+        "title": "AI Query Gen",
+        "desc": "Gemini creates optimal search keywords."
+      },
+      "step3": {
+        "title": "KIPRIS Search",
+        "desc": "Scans millions of Korean patents."
+      },
+      "step4": {
+        "title": "Analysis",
+        "desc": "Extracts claims & calculates vector similarity."
+      },
+      "step5": {
+        "title": "Results",
+        "desc": "Get matches with >0.7 similarity score."
+      }
+    },
+    "features": {
+      "title": "Key Features",
+      "feature1": "AI-Powered Query Optimization",
+      "feature2": "Auto Claim Extraction",
+      "feature3": "Vector Similarity Analysis",
+      "feature4": "Smart Filtering (>0.7)"
+    },
+    "ctaSection": {
+      "title": "Ready to revolutionize your patent search?",
+      "button": "Get Started Free"
+    }
+  }
+}

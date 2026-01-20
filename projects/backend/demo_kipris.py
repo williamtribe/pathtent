@@ -1,64 +1,24 @@
 #!/usr/bin/env python3
 import asyncio
-import os
 
-try:
-    from dotenv import load_dotenv
-except ImportError:  # pragma: no cover - optional dependency for demo convenience
-    load_dotenv = None
-
-import httpx
-
-from kipris import KIPRISAPIError, KIPRISClient, KIPRISResponseParseError, SearchParams
+from kipris import KIPRISClient, SearchParams
 
 
 async def main() -> None:
-    if load_dotenv:
-        load_dotenv()
+    service_key = "여기에_KIPRIS_서비스키_입력"
 
-    service_key = os.getenv("KIPRIS_ACCESS_KEY") or os.getenv("KIPRIS_SERVICE_KEY", "")
-    if not service_key:
-        raise ValueError(
-            "KIPRIS_ACCESS_KEY is missing. Set it in .env or your environment."
-        )
-
-    base_url = os.getenv("KIPRIS_BASE_URL")
-    pdf_base_url = os.getenv("KIPRIS_PDF_BASE_URL")
-    pdf_service_key = os.getenv("KIPRIS_PDF_SERVICE_KEY") or os.getenv("KIPRIS_SERVICE_KEY")
-    debug = os.getenv("KIPRIS_DEBUG", "").lower() in {"1", "true", "yes", "on"}
-    async with KIPRISClient(
-        service_key,
-        base_url=base_url,
-        pdf_base_url=pdf_base_url,
-        pdf_service_key=pdf_service_key,
-        debug=debug,
-    ) as client:
+    async with KIPRISClient(service_key) as client:
         # 테스트 1: "센서" 키워드로 검색
         print("=" * 60)
         print("KIPRIS API 시범 호출 테스트")
         print("=" * 60)
 
-        params = SearchParams(word="센서", docs_start=1, docs_count=5)
+        params = SearchParams(word="강아지", num_of_rows=5)
         print(f"\n검색어: '{params.word}'")
-        print(f"요청 건수: {params.docs_count or params.num_of_rows}")
+        print(f"요청 건수: {params.num_of_rows}")
         print("-" * 60)
 
-        try:
-            results = await client.search(params)
-        except KIPRISAPIError as exc:
-            print(f"\n❌ KIPRIS API 오류 발생 ({exc}). 입력값 또는 API 키를 확인해 주세요.")
-            return
-        except KIPRISResponseParseError as exc:
-            print(f"\n❌ KIPRIS 응답 파싱 실패: {exc}")
-            return
-        except httpx.HTTPStatusError as exc:
-            status_code = exc.response.status_code if exc.response else "unknown"
-            request_url = exc.request.url if exc.request else "unknown"
-            print(
-                "\n❌ KIPRIS API 오류 발생 "
-                f"(HTTP {status_code}, {request_url}). 잠시 후 다시 시도해 주세요."
-            )
-            return
+        results = await client.search(params)
 
         print(f"\n✅ 검색 결과: {len(results)}건")
         print("-" * 60)
@@ -82,32 +42,13 @@ async def main() -> None:
                 print(f"PDF 정보 조회 테스트 (출원번호: {app_no})")
                 print("=" * 60)
 
-                if not pdf_service_key:
-                    print("❌ KIPRIS_SERVICE_KEY 또는 KIPRIS_PDF_SERVICE_KEY가 없어 PDF 조회를 건너뜁니다.")
-                    return
-
-                try:
-                    pdf_info = await client.get_publication_pdf_info(app_no)
-                except KIPRISAPIError as exc:
-                    print(f"❌ 공개 PDF 조회 오류: {exc}")
-                    if exc.result_code == "10":
-                        print("   → KIPRIS_SERVICE_KEY(PDF용) 값이 맞는지 확인해 주세요.")
-                except KIPRISResponseParseError as exc:
-                    print(f"❌ 공개 PDF 응답 파싱 실패: {exc}")
-                except httpx.HTTPStatusError as exc:
-                    status_code = exc.response.status_code if exc.response else "unknown"
-                    request_url = exc.request.url if exc.request else "unknown"
-                    print(
-                        "❌ 공개 PDF 조회 실패 "
-                        f"(HTTP {status_code}, {request_url}). 잠시 후 다시 시도해 주세요."
-                    )
+                pdf_info = await client.get_publication_pdf_info(app_no)
+                if pdf_info:
+                    print("✅ 공개 PDF 발견!")
+                    print(f"   파일명: {pdf_info.doc_name}")
+                    print(f"   경로: {pdf_info.path[:80]}...")
                 else:
-                    if pdf_info:
-                        print("✅ 공개 PDF 발견!")
-                        print(f"   파일명: {pdf_info.doc_name}")
-                        print(f"   경로: {pdf_info.path[:80]}...")
-                    else:
-                        print("❌ 공개 PDF 없음 (아직 공개되지 않았거나 PDF 미생성)")
+                    print("❌ 공개 PDF 없음 (아직 공개되지 않았거나 PDF 미생성)")
 
         print("\n" + "=" * 60)
         print("테스트 완료!")

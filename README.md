@@ -6,16 +6,10 @@ KIPRIS(특허정보검색서비스) API를 활용한 특허 검색 클라이언�
 
 ### 1. API 키 설정
 
-`projects/backend/.env.example`을 복사해 `.env`를 만들고 KIPRIS API 서비스 키를 입력합니다:
+`projects/backend/demo_kipris.py` 파일을 열고 8번째 줄의 `service_key`에 KIPRIS API 서비스 키를 입력합니다:
 
-```bash
-cd projects/backend
-cp .env.example .env
-```
-
-```env
-KIPRIS_ACCESS_KEY=여기에_KIPRIS_서비스키_입력
-KIPRIS_SERVICE_KEY=여기에_KIPRIS_서비스키_입력
+```python
+service_key = "여기에_KIPRIS_서비스키_입력"
 ```
 
 **KIPRIS API 키 발급:**
