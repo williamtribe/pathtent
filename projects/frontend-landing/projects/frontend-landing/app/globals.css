@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+@theme {
+  /* Primary Colors */
+  --color-primary: #2D57FD;
+  --color-primary-hover: #1E45E5;
+  
+  /* Secondary & Surface */
+  --color-secondary: #D6E0F0;
+  --color-surface: #F9F9F9;
+  
+  /* Borders */
+  --color-border: #E0E0E0;
+  
+  /* Text */
+  --color-text: #0D1012;
+  --color-text-muted: #6B7280;
+}
+
+@layer base {
+  :root {
+    --font-geist-sans: var(--font-geist-sans);
+    --font-geist-mono: var(--font-geist-mono);
+    --font-inter: var(--font-inter);
+    --font-ibm-plex-sans: var(--font-ibm-plex-sans);
+  }
+  
+  body {
+    @apply antialiased;
+  }
+}
