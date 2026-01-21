@@ -1,5 +1,0 @@
-{
-  "buildCommand": "cd projects/frontend-landing && bun install && bun run build",
-  "installCommand": "cd projects/frontend-landing && bun install",
-  "outputDirectory": "projects/frontend-landing/.next"
-}
