@@ -136,6 +136,12 @@ export default function Home() {
               </motion.div>
             ))}
           </div>
+
+          <div className="mt-12 text-center">
+            <Link href="/sna" className="inline-flex items-center gap-2 text-primary hover:underline font-medium">
+              IPC 네트워크 분석 도구 살펴보기 <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
         </div>
       </section>
 

@@ -345,6 +345,8 @@ export interface SNAParams {
   startYear?: number
   endYear?: number
   includeYearly?: boolean
+  enableFilter?: boolean
+  minSimilarity?: number
 }
 
 // ============================================================================
@@ -364,6 +366,12 @@ export async function analyzeSNA(params: SNAParams): Promise<SNAResult> {
   }
   if (params.endYear) {
     searchParams.set('end_year', params.endYear.toString())
+  }
+  if (params.enableFilter) {
+    searchParams.set('enable_filter', 'true')
+    if (params.minSimilarity) {
+      searchParams.set('min_similarity', params.minSimilarity.toString())
+    }
   }
 
   const response = await fetch(`${API_BASE_URL}/api/v1/patent/sna/free?${searchParams}`)
