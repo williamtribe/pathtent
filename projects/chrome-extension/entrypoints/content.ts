@@ -6,6 +6,8 @@ export default defineContentScript({
   main() {
     console.log('Patent Guide Assistant - Content Script Loaded');
 
+    const STORAGE_KEY = 'patent_guide_state';
+
     const chatPanelContainer = document.createElement('div');
     chatPanelContainer.id = 'patent-chat-panel-container';
     document.body.appendChild(chatPanelContainer);
@@ -41,11 +43,11 @@ export default defineContentScript({
       display: none;
       position: fixed;
       top: 0;
-      right: 0;
-      width: 400px;
+      left: 0;
+      width: 320px;
       height: 100vh;
       background: white;
-      box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+      box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
       z-index: 999998;
       flex-direction: column;
     `;
@@ -179,10 +181,27 @@ export default defineContentScript({
         .input-container.hidden {
           display: none;
         }
+        .reset-btn {
+          background: #ef4444;
+          color: white;
+          border: none;
+          border-radius: 8px;
+          padding: 8px 16px;
+          font-size: 12px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.3s ease;
+        }
+        .reset-btn:hover {
+          background: #dc2626;
+        }
       </style>
       <div class="chat-header">
         <h1>💬 특허 가이드 도우미</h1>
-        <button class="close-btn">×</button>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <button class="reset-btn">처음부터 다시</button>
+          <button class="close-btn">×</button>
+        </div>
       </div>
       <div class="messages">
         <div class="message assistant">
@@ -218,6 +237,14 @@ export default defineContentScript({
     closeBtn?.addEventListener('click', () => {
       chatPanel.style.display = 'none';
       button.style.display = 'block';
+    });
+
+    const resetBtn = chatPanel.querySelector('.reset-btn');
+    resetBtn?.addEventListener('click', () => {
+      chrome.storage.local.remove([STORAGE_KEY], () => {
+        console.log('Guide state cleared - restarting from beginning');
+        location.reload();
+      });
     });
 
     const input = chatPanel.querySelector('input');
@@ -332,7 +359,29 @@ export default defineContentScript({
     chatPanelContainer.appendChild(chatPanel);
     document.body.appendChild(container);
 
-    // Background로부터 가이드 시작 메시지 수신
+    chrome.storage.local.get([STORAGE_KEY], (result) => {
+      if (result[STORAGE_KEY]) {
+        const { currentStep } = result[STORAGE_KEY];
+        console.log(`Resuming guide from step ${currentStep + 1}`);
+        chatPanel.style.display = 'flex';
+        button.style.display = 'none';
+        
+        chrome.runtime.sendMessage(
+          { type: 'ASK_AI', question: '가이드 재개' },
+          (response) => {
+            if (response.success) {
+              const resumeMessageDiv = document.createElement('div');
+              resumeMessageDiv.className = 'message assistant';
+              resumeMessageDiv.innerHTML = `<div class="message-content">가이드를 계속 진행합니다! (${currentStep + 1}/${response.steps.length}단계)</div>`;
+              messagesContainer?.appendChild(resumeMessageDiv);
+              
+              startGuide(response.steps, currentStep);
+            }
+          }
+        );
+      }
+    });
+
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       if (message.type === 'START_GUIDE') {
         startGuide(message.steps);
@@ -340,10 +389,22 @@ export default defineContentScript({
       }
     });
 
-    function startGuide(steps: Array<{ selector: string; title: string; description: string; url?: string; externalLink?: string }>) {
-      let currentStepIndex = 0;
+    function startGuide(steps: Array<{ selector: string; title: string; description: string; url?: string; externalLink?: string; autoAdvance?: boolean }>, startFromStep: number = 0) {
+      let currentStepIndex = startFromStep;
       let currentDriver: any = null;
       let clickListener: ((e: Event) => void) | null = null;
+
+      const saveProgress = (stepIndex: number) => {
+        chrome.storage.local.set({
+          [STORAGE_KEY]: {
+            currentStep: stepIndex,
+          }
+        });
+      };
+
+      const clearProgress = () => {
+        chrome.storage.local.remove([STORAGE_KEY]);
+      };
 
       const moveToNextStep = () => {
         if (currentDriver) {
@@ -362,19 +423,187 @@ export default defineContentScript({
 
         currentStepIndex++;
         if (currentStepIndex < steps.length) {
+          saveProgress(currentStepIndex);
           setTimeout(() => showStep(currentStepIndex), 300);
+        } else {
+          clearProgress();
+          
+          chrome.storage.local.get(['patent_invention_names'], (result) => {
+            const completionMessageDiv = document.createElement('div');
+            completionMessageDiv.className = 'message assistant';
+            completionMessageDiv.innerHTML = `<div class="message-content">🎉 가이드를 모두 완료했습니다!</div>`;
+            messagesContainer?.appendChild(completionMessageDiv);
+            
+            if (result.patent_invention_names) {
+              const { korean, english } = result.patent_invention_names;
+              
+              const inventionNamesDiv = document.createElement('div');
+              inventionNamesDiv.style.cssText = 'padding: 0 20px 20px;';
+              inventionNamesDiv.innerHTML = `
+                <div style="background: #f3f4f6; border-radius: 12px; padding: 16px; margin-bottom: 12px;">
+                  <h3 style="font-size: 14px; font-weight: 600; margin-bottom: 12px; color: #1f2937;">📋 발명의 명칭</h3>
+                  
+                  <div style="background: white; border-radius: 8px; padding: 12px; margin-bottom: 8px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                      <div style="flex: 1;">
+                        <p style="font-size: 11px; color: #6b7280; margin-bottom: 4px;">국문</p>
+                        <p style="font-size: 14px; font-weight: 500; color: #1f2937;">${korean}</p>
+                      </div>
+                      <button class="copy-korean-btn" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 6px; padding: 8px 16px; font-size: 12px; font-weight: 600; cursor: pointer; margin-left: 12px; white-space: nowrap;">복사</button>
+                    </div>
+                  </div>
+                  
+                  <div style="background: white; border-radius: 8px; padding: 12px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                      <div style="flex: 1;">
+                        <p style="font-size: 11px; color: #6b7280; margin-bottom: 4px;">영문</p>
+                        <p style="font-size: 14px; font-weight: 500; color: #1f2937;">${english}</p>
+                      </div>
+                      <button class="copy-english-btn" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 6px; padding: 8px 16px; font-size: 12px; font-weight: 600; cursor: pointer; margin-left: 12px; white-space: nowrap;">복사</button>
+                    </div>
+                  </div>
+                </div>
+              `;
+              
+              chatPanel.appendChild(inventionNamesDiv);
+              
+              const copyKoreanBtn = inventionNamesDiv.querySelector('.copy-korean-btn');
+              const copyEnglishBtn = inventionNamesDiv.querySelector('.copy-english-btn');
+              
+              copyKoreanBtn?.addEventListener('click', async () => {
+                await navigator.clipboard.writeText(korean);
+                const originalText = copyKoreanBtn.textContent;
+                copyKoreanBtn.textContent = '✓ 복사됨!';
+                setTimeout(() => {
+                  copyKoreanBtn.textContent = originalText;
+                }, 2000);
+              });
+              
+              copyEnglishBtn?.addEventListener('click', async () => {
+                await navigator.clipboard.writeText(english);
+                const originalText = copyEnglishBtn.textContent;
+                copyEnglishBtn.textContent = '✓ 복사됨!';
+                setTimeout(() => {
+                  copyEnglishBtn.textContent = originalText;
+                }, 2000);
+              });
+            }
+            
+            messagesContainer?.scrollTo({ top: messagesContainer.scrollHeight, behavior: 'smooth' });
+          });
         }
       };
 
-      const showStep = (index: number) => {
+      const showStep = (index: number, retryCount: number = 0) => {
         if (index >= steps.length) return;
 
         const step = steps[index];
+        
+        if (index === 5 && window.location.href.includes('popUpInfo.do')) {
+          const popupInfoMessageDiv = document.createElement('div');
+          popupInfoMessageDiv.className = 'message assistant';
+          popupInfoMessageDiv.innerHTML = `<div class="message-content">ℹ️ 특허고객 행정처리 편리화에 대한 안내 페이지입니다.<br><br>내용을 확인하신 후 팝업을 닫고 원래 페이지로 돌아가서 계속 진행하시면 됩니다.</div>`;
+          messagesContainer?.appendChild(popupInfoMessageDiv);
+          messagesContainer?.scrollTo({ top: messagesContainer.scrollHeight, behavior: 'smooth' });
+          
+          const interval = setInterval(() => {
+            if (!window.location.href.includes('popUpInfo.do')) {
+              clearInterval(interval);
+              const returnMessageDiv = document.createElement('div');
+              returnMessageDiv.className = 'message assistant';
+              returnMessageDiv.innerHTML = `<div class="message-content">✅ 원래 페이지로 돌아왔습니다. 다시 시도합니다...</div>`;
+              messagesContainer?.appendChild(returnMessageDiv);
+              messagesContainer?.scrollTo({ top: messagesContainer.scrollHeight, behavior: 'smooth' });
+              setTimeout(() => showStep(index, 0), 500);
+            }
+          }, 1000);
+          return;
+        }
+        
+        if (step.url && !window.location.href.includes(step.url.split('/').pop() || '')) {
+          console.log(`Current page doesn't match step ${index + 1} URL. Expected: ${step.url}, Current: ${window.location.href}`);
+          
+          if (retryCount < 10) {
+            setTimeout(() => showStep(index, retryCount + 1), 500);
+            return;
+          } else {
+            const errorMessageDiv = document.createElement('div');
+            errorMessageDiv.className = 'message assistant';
+            errorMessageDiv.innerHTML = `<div class="message-content">⚠️ 올바른 페이지로 이동하지 않았습니다.<br><br>예상 페이지: ${step.url}<br>현재 페이지: ${window.location.href}<br><br>페이지를 확인해주세요.</div>`;
+            messagesContainer?.appendChild(errorMessageDiv);
+            messagesContainer?.scrollTo({ top: messagesContainer.scrollHeight, behavior: 'smooth' });
+            
+            const skipButtonDiv = document.createElement('div');
+            skipButtonDiv.style.cssText = 'padding: 0 20px 20px; display: flex; gap: 10px;';
+            skipButtonDiv.innerHTML = `
+              <button style="flex: 1; background: #ef4444; color: white; border: none; border-radius: 8px; padding: 12px; font-weight: 600; cursor: pointer;">가이드 종료</button>
+              <button style="flex: 1; background: #667eea; color: white; border: none; border-radius: 8px; padding: 12px; font-weight: 600; cursor: pointer;">다시 시도</button>
+            `;
+            
+            const endBtn = skipButtonDiv.querySelector('button:first-child');
+            const retryBtn = skipButtonDiv.querySelector('button:last-child');
+            
+            endBtn?.addEventListener('click', () => {
+              clearProgress();
+              skipButtonDiv.remove();
+              const endMessageDiv = document.createElement('div');
+              endMessageDiv.className = 'message assistant';
+              endMessageDiv.innerHTML = `<div class="message-content">가이드를 종료했습니다.</div>`;
+              messagesContainer?.appendChild(endMessageDiv);
+            });
+            
+            retryBtn?.addEventListener('click', () => {
+              skipButtonDiv.remove();
+              showStep(index, 0);
+            });
+            
+            chatPanel.appendChild(skipButtonDiv);
+            return;
+          }
+        }
+        
         const element = document.querySelector(step.selector);
 
         if (!element) {
-          console.warn(`Element not found: ${step.selector}`);
-          return;
+          console.warn(`Element not found: ${step.selector}, retry ${retryCount + 1}/10`);
+          
+          if (retryCount < 10) {
+            setTimeout(() => showStep(index, retryCount + 1), 500);
+            return;
+          } else {
+            const errorMessageDiv = document.createElement('div');
+            errorMessageDiv.className = 'message assistant';
+            errorMessageDiv.innerHTML = `<div class="message-content">⚠️ 이 페이지에서 다음 단계를 찾을 수 없습니다.<br><br>올바른 페이지로 이동했는지 확인해주세요.<br><br>진행을 계속하려면 아래 버튼을 눌러주세요.</div>`;
+            messagesContainer?.appendChild(errorMessageDiv);
+            messagesContainer?.scrollTo({ top: messagesContainer.scrollHeight, behavior: 'smooth' });
+            
+            const skipButtonDiv = document.createElement('div');
+            skipButtonDiv.style.cssText = 'padding: 0 20px 20px; display: flex; gap: 10px;';
+            skipButtonDiv.innerHTML = `
+              <button style="flex: 1; background: #ef4444; color: white; border: none; border-radius: 8px; padding: 12px; font-weight: 600; cursor: pointer;">가이드 종료</button>
+              <button style="flex: 1; background: #667eea; color: white; border: none; border-radius: 8px; padding: 12px; font-weight: 600; cursor: pointer;">다시 시도</button>
+            `;
+            
+            const endBtn = skipButtonDiv.querySelector('button:first-child');
+            const retryBtn = skipButtonDiv.querySelector('button:last-child');
+            
+            endBtn?.addEventListener('click', () => {
+              clearProgress();
+              skipButtonDiv.remove();
+              const endMessageDiv = document.createElement('div');
+              endMessageDiv.className = 'message assistant';
+              endMessageDiv.innerHTML = `<div class="message-content">가이드를 종료했습니다.</div>`;
+              messagesContainer?.appendChild(endMessageDiv);
+            });
+            
+            retryBtn?.addEventListener('click', () => {
+              skipButtonDiv.remove();
+              showStep(index, 0);
+            });
+            
+            chatPanel.appendChild(skipButtonDiv);
+            return;
+          }
         }
 
         let description = step.description;
@@ -382,67 +611,124 @@ export default defineContentScript({
           description += `<br><br><a href="${step.externalLink}" target="_blank" style="color: #667eea; font-weight: bold;">🔗 ${step.externalLink}</a>`;
         }
 
-        description += `<br><br><small style="color: #9ca3af;">💡 이 요소를 직접 클릭하면 자동으로 다음 단계로 넘어갑니다.</small>`;
-
-        currentDriver = driver({
-          showProgress: true,
-          showButtons: ['next', 'previous', 'close'],
-          steps: [{
-            element: step.selector,
-            popover: {
-              title: step.title,
-              description: description,
-              side: 'left',
-              align: 'start',
-              onNextClick: () => {
-                moveToNextStep();
-              },
-              onPrevClick: () => {
-                if (currentDriver) {
-                  currentDriver.destroy();
-                  currentDriver = null;
-                }
-                if (clickListener) {
-                  const currentStep = steps[currentStepIndex];
-                  const currentElement = document.querySelector(currentStep.selector);
-                  if (currentElement) {
-                    currentElement.removeEventListener('click', clickListener);
+        if (step.autoAdvance !== false) {
+          description += `<br><br><small style="color: #9ca3af;">💡 이 요소를 직접 클릭하면 자동으로 다음 단계로 넘어갑니다.</small>`;
+          
+          currentDriver = driver({
+            showProgress: true,
+            showButtons: ['next', 'previous', 'close'],
+            steps: [{
+              element: step.selector,
+              popover: {
+                title: step.title,
+                description: description,
+                side: 'left',
+                align: 'start',
+                onNextClick: () => {
+                  moveToNextStep();
+                },
+                onPrevClick: () => {
+                  if (currentDriver) {
+                    currentDriver.destroy();
+                    currentDriver = null;
                   }
-                  clickListener = null;
-                }
-                if (index > 0) {
-                  currentStepIndex = index - 1;
-                  showStep(currentStepIndex);
-                }
-              },
-              onCloseClick: () => {
-                if (currentDriver) {
-                  currentDriver.destroy();
-                  currentDriver = null;
-                }
-                if (clickListener) {
-                  const currentStep = steps[currentStepIndex];
-                  const currentElement = document.querySelector(currentStep.selector);
-                  if (currentElement) {
-                    currentElement.removeEventListener('click', clickListener);
+                  if (index > 0) {
+                    currentStepIndex = index - 1;
+                    saveProgress(currentStepIndex);
+                    showStep(currentStepIndex);
                   }
-                  clickListener = null;
-                }
+                },
+                onCloseClick: () => {
+                  if (currentDriver) {
+                    currentDriver.destroy();
+                    currentDriver = null;
+                  }
+                  clearProgress();
+                },
               },
-            },
-          }],
-        });
+            }],
+          });
 
-        clickListener = (e: Event) => {
-          console.log('Element clicked! Moving to next step...');
-          e.stopPropagation();
-          moveToNextStep();
-        };
+          clickListener = (e: Event) => {
+            console.log('Element clicked! Moving to next step...');
+            
+            const nextStepIndex = currentStepIndex + 1;
+            if (nextStepIndex < steps.length) {
+              saveProgress(nextStepIndex);
+              console.log(`Saved progress: step ${nextStepIndex}`);
+            }
+            
+            setTimeout(() => {
+              moveToNextStep();
+            }, 100);
+          };
 
-        element.addEventListener('click', clickListener, { capture: true, once: true });
-
-        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        currentDriver.drive();
+          element.addEventListener('click', clickListener, { capture: true, once: true });
+          
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          currentDriver.drive();
+        } else {
+          const stepMessageDiv = document.createElement('div');
+          stepMessageDiv.className = 'message assistant';
+          stepMessageDiv.innerHTML = `<div class="message-content"><strong>${step.title}</strong><br><br>${step.description}${step.externalLink ? `<br><br><a href="${step.externalLink}" target="_blank" style="color: #667eea; font-weight: bold;">🔗 ${step.externalLink}</a>` : ''}</div>`;
+          messagesContainer?.appendChild(stepMessageDiv);
+          
+          if ((step as any).showCopyButton) {
+            chrome.storage.local.get(['patent_invention_names'], (result) => {
+              if (result.patent_invention_names) {
+                const { korean, english } = result.patent_invention_names;
+                const copyType = (step as any).showCopyButton;
+                const nameToShow = copyType === 'korean' ? korean : english;
+                const label = copyType === 'korean' ? '국문 명칭' : '영문 명칭';
+                
+                const copyButtonDiv = document.createElement('div');
+                copyButtonDiv.style.cssText = 'padding: 0 20px 20px;';
+                copyButtonDiv.innerHTML = `
+                  <div style="background: #f3f4f6; border-radius: 12px; padding: 16px; margin-bottom: 12px;">
+                    <p style="font-size: 12px; color: #6b7280; margin-bottom: 8px;">${label}</p>
+                    <div style="background: white; border-radius: 8px; padding: 12px; display: flex; justify-content: space-between; align-items: center;">
+                      <p style="font-size: 14px; font-weight: 500; color: #1f2937; flex: 1;">${nameToShow}</p>
+                      <button class="copy-name-btn" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 6px; padding: 8px 16px; font-size: 12px; font-weight: 600; cursor: pointer; margin-left: 12px; white-space: nowrap;">📋 복사</button>
+                    </div>
+                  </div>
+                `;
+                
+                chatPanel.appendChild(copyButtonDiv);
+                
+                const copyBtn = copyButtonDiv.querySelector('.copy-name-btn');
+                copyBtn?.addEventListener('click', async () => {
+                  await navigator.clipboard.writeText(nameToShow);
+                  const originalText = copyBtn.textContent;
+                  copyBtn.textContent = '✓ 복사됨!';
+                  setTimeout(() => {
+                    copyBtn.textContent = originalText;
+                  }, 2000);
+                });
+              }
+            });
+          }
+          
+          const completeButtonDiv = document.createElement('div');
+          completeButtonDiv.style.cssText = 'padding: 0 20px 20px; display: flex; gap: 10px;';
+          completeButtonDiv.innerHTML = `
+            <button style="flex: 1; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; border-radius: 12px; padding: 14px 28px; font-size: 16px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);">✅ 완료했어요!</button>
+          `;
+          
+          const completeBtn = completeButtonDiv.querySelector('button');
+          completeBtn?.addEventListener('click', () => {
+            completeButtonDiv.remove();
+            
+            const completedMessageDiv = document.createElement('div');
+            completedMessageDiv.className = 'message user';
+            completedMessageDiv.innerHTML = `<div class="message-content">완료했어요!</div>`;
+            messagesContainer?.appendChild(completedMessageDiv);
+            
+            moveToNextStep();
+          });
+          
+          chatPanel.appendChild(completeButtonDiv);
+          messagesContainer?.scrollTo({ top: messagesContainer.scrollHeight, behavior: 'smooth' });
+        }
 
         setTimeout(() => {
           const highlightedElement = document.querySelector('.driver-active-element');
@@ -453,7 +739,7 @@ export default defineContentScript({
         }, 100);
       };
 
-      showStep(0);
+      showStep(startFromStep);
     }
   },
 });

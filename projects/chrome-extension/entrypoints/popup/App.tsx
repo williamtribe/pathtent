@@ -33,7 +33,18 @@ export default function App() {
           tabId: tab.id,
         },
         (response) => {
-          if (response.success) {
+          if (chrome.runtime.lastError) {
+            console.error('Runtime error:', chrome.runtime.lastError);
+            const errorMessage: Message = {
+              role: 'assistant',
+              content: '연결 오류가 발생했습니다. 페이지를 새로고침해주세요.',
+            };
+            setMessages((prev) => [...prev, errorMessage]);
+            setLoading(false);
+            return;
+          }
+          
+          if (response && response.success) {
             const assistantMessage: Message = {
               role: 'assistant',
               content: '가이드를 시작하겠습니다. 화면을 확인해주세요!',

@@ -29,17 +29,31 @@ QUESTION_GENERATION_PROMPT = """
 5. 청구항: 보호받고자 하는 권리 범위
 </질문_카테고리>
 
+<질문_유형>
+객관식으로 처리 가능한 질문은 choices를 제공하세요:
+- 적용분야: 산업 분야 (제조, 의료, 통신, 금융, 교육, 농업 등)
+- 기술분야: 기술 카테고리 (AI/ML, IoT, 클라우드, 블록체인, 로봇 등)
+- 효과: 주요 효과 유형 (비용절감, 시간단축, 품질향상, 안전성향상 등)
+
+주관식이 필요한 질문은 choices를 비워두세요:
+- 구체적인 구현 방법
+- 기술적 상세 설명
+- 특정 문제점 설명
+</질문_유형>
+
 <규칙>
 - 총 5-7개의 질문 생성
 - 각 카테고리에서 최소 1개 이상의 질문 포함
 - 연구 내용에서 명확하지 않은 부분 중심으로 질문
 - 특허 명세서 작성에 실질적으로 필요한 정보만 질문
 - 질문은 구체적이고 명확하게 작성
+- 객관식 질문의 경우 4-6개의 선택지 제공
+- 모든 객관식 질문에는 "기타 (직접 입력)" 옵션이 자동으로 추가됨
 </규칙>
 
 <출력_형식>
 1. 연구 내용 요약 (2-3문장)
-2. 질문 목록 (각 질문에 카테고리, 힌트 포함)
+2. 질문 목록 (각 질문에 카테고리, 힌트, choices(선택적) 포함)
 </출력_형식>
 """
 
@@ -53,6 +67,9 @@ class QuestionItem(BaseModel):
         ..., description="카테고리: 기술, 배경, 효과, 적용분야, 청구항"
     )
     hint: str = Field(..., description="답변 힌트 또는 예시")
+    choices: list[str] | None = Field(
+        None, description="객관식 선택지 (없으면 주관식)"
+    )
 
 
 class QuestionGenerationResult(BaseModel):
@@ -71,7 +88,7 @@ PATENT_GENERATION_PROMPT = """
 연구 내용과 추가 답변을 바탕으로 한국 특허 명세서 형식에 맞는 완전한 명세서를 작성합니다.
 
 <한국_특허_명세서_형식>
-1. 발명의 명칭
+1. 발명의 명칭 (국문 및 영문)
 2. 기술분야
 3. 발명의 배경이 되는 기술
 4. 해결하려는 과제
@@ -81,6 +98,13 @@ PATENT_GENERATION_PROMPT = """
 8. 청구항
 9. 요약서
 </한국_특허_명세서_형식>
+
+<발명의_명칭_작성_규칙>
+- 국문 명칭: 발명의 핵심 내용을 간결하게 표현 (20자 이내 권장)
+- 영문 명칭: 국문 명칭을 정확하게 영어로 번역
+- 너무 포괄적이거나 추상적인 표현 지양
+- 기술적 특징을 명확히 드러내는 용어 사용
+</발명의_명칭_작성_규칙>
 
 <청구항_작성_규칙>
 - 독립항 1개 이상 필수
@@ -112,7 +136,8 @@ class ClaimItem(BaseModel):
 class PatentSpecificationResult(BaseModel):
     """Generated patent specification."""
 
-    title: str = Field(..., description="발명의 명칭")
+    title: str = Field(..., description="발명의 명칭 (국문)")
+    title_en: str = Field(..., description="발명의 명칭 (영문)")
     technical_field: str = Field(..., description="기술분야")
     background_art: str = Field(..., description="발명의 배경이 되는 기술")
     problem_to_solve: str = Field(..., description="해결하려는 과제")

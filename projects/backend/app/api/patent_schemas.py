@@ -18,6 +18,7 @@ class Question(BaseModel):
         ..., description="질문 카테고리 (기술, 배경, 효과, 적용분야, 청구항)"
     )
     hint: str | None = Field(None, description="답변 힌트")
+    choices: list[str] | None = Field(None, description="객관식 선택지 (없으면 주관식)")
 
 
 class AnalyzeResponse(BaseModel):
@@ -54,7 +55,8 @@ class Claim(BaseModel):
 class PatentSpecification(BaseModel):
     """Generated patent specification."""
 
-    title: str = Field(..., description="발명의 명칭")
+    title: str = Field(..., description="발명의 명칭 (국문)")
+    title_en: str = Field(..., description="발명의 명칭 (영문)")
     technical_field: str = Field(..., description="기술분야")
     background_art: str = Field(..., description="발명의 배경이 되는 기술")
     problem_to_solve: str = Field(..., description="해결하려는 과제")
@@ -83,3 +85,25 @@ class SessionStatusResponse(BaseModel):
     )
     created_at: str
     specification: PatentSpecification | None = None
+
+
+class ChatMessage(BaseModel):
+    """Chat message for patent specification refinement."""
+
+    role: str = Field(..., description="메시지 역할: user 또는 assistant")
+    content: str = Field(..., description="메시지 내용")
+
+
+class ChatRequest(BaseModel):
+    """Request to refine patent specification via chat."""
+
+    session_id: str = Field(..., description="세션 ID")
+    message: str = Field(..., description="사용자 메시지")
+
+
+class ChatResponse(BaseModel):
+    """Response with updated specification and assistant message."""
+
+    session_id: str
+    message: str = Field(..., description="AI 응답 메시지")
+    specification: PatentSpecification = Field(..., description="업데이트된 명세서")

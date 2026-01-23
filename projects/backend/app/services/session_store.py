@@ -20,7 +20,8 @@ class Session:
     questions: list[dict[str, Any]] = field(default_factory=list)
     answers: dict[str, str] = field(default_factory=dict)
     specification: dict[str, Any] | None = None
-    status: str = "pending"  # pending | analyzed | generating | completed | expired
+    chat_history: list[dict[str, str]] = field(default_factory=list)
+    status: str = "pending"
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: datetime = field(default_factory=datetime.now)
 

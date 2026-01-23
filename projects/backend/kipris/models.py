@@ -64,3 +64,90 @@ class PDFInfo(BaseModel):
     path: str = Field(alias="path")
 
     model_config = {"populate_by_name": True}
+
+
+class IPCInfo(BaseModel):
+    ipc_code: str | None = Field(None, alias="InternationalpatentclassificationNumber")
+    ipc_date: str | None = Field(None, alias="InternationalpatentclassificationDate")
+
+    model_config = {"populate_by_name": True}
+
+
+class IPCSearchParams(BaseModel):
+    ipc_number: str = Field(..., alias="ipcNumber")
+    docs_start: int = Field(1, alias="docsStart")
+    docs_count: int = Field(30, alias="docsCount")
+    patent: bool | None = Field(None, alias="patent")
+    utility: bool | None = Field(None, alias="utility")
+    last_value: Literal["", "A", "C", "F", "G", "I", "J", "R"] | None = Field(None, alias="lastvalue")
+    sort_spec: Literal["PD", "AD", "GD", "OPD", "FD", "FOD", "RD"] | None = Field(None, alias="sortSpec")
+    desc_sort: bool | None = Field(None, alias="descSort")
+
+    model_config = {"populate_by_name": True}
+
+
+class IPCSearchResult(BaseModel):
+    applicant: str | None = Field(None, alias="Applicant")
+    opening_date: str | None = Field(None, alias="OpeningDate")
+    opening_number: str | None = Field(None, alias="OpeningNumber")
+    public_number: str | None = Field(None, alias="PublicNumber")
+    public_date: str | None = Field(None, alias="PublicDate")
+    registration_date: str | None = Field(None, alias="RegistrationDate")
+    registration_number: str | None = Field(None, alias="RegistrationNumber")
+    registration_status: str | None = Field(None, alias="RegistrationStatus")
+    application_date: str | None = Field(None, alias="ApplicationDate")
+    application_number: str | None = Field(None, alias="ApplicationNumber")
+    abstract: str | None = Field(None, alias="Abstract")
+    drawing_path: str | None = Field(None, alias="DrawingPath")
+    thumbnail_path: str | None = Field(None, alias="ThumbnailPath")
+    serial_number: str | None = Field(None, alias="SerialNumber")
+    invention_name: str | None = Field(None, alias="InventionName")
+    ipc_number: str | None = Field(None, alias="InternationalpatentclassificationNumber")
+
+    model_config = {"populate_by_name": True}
+
+
+class IPCSearchResponse(BaseModel):
+    results: list[IPCSearchResult]
+    docs_start: int
+    total_count: int
+
+
+class FreeSearchParams(BaseModel):
+    word: str = Field(..., alias="word")
+    docs_start: int = Field(1, alias="docsStart")
+    docs_count: int = Field(30, alias="docsCount")
+    patent: bool | None = Field(None, alias="patent")
+    utility: bool | None = Field(None, alias="utility")
+    last_value: Literal["", "A", "C", "F", "G", "I", "J", "R"] | None = Field(None, alias="lastvalue")
+    sort_spec: Literal["PD", "AD", "GD", "OPD", "FD", "FOD", "RD"] | None = Field(None, alias="sortSpec")
+    desc_sort: bool | None = Field(None, alias="descSort")
+
+    model_config = {"populate_by_name": True}
+
+
+class FreeSearchResult(BaseModel):
+    serial_number: str | None = Field(None, alias="SerialNumber")
+    application_number: str | None = Field(None, alias="ApplicationNumber")
+    application_date: str | None = Field(None, alias="ApplicationDate")
+    opening_number: str | None = Field(None, alias="OpeningNumber")
+    opening_date: str | None = Field(None, alias="OpeningDate")
+    public_number: str | None = Field(None, alias="PublicNumber")
+    public_date: str | None = Field(None, alias="PublicDate")
+    registration_number: str | None = Field(None, alias="RegistrationNumber")
+    registration_date: str | None = Field(None, alias="RegistrationDate")
+    ipc_number: str | None = Field(None, alias="InternationalpatentclassificationNumber")
+    invention_name: str | None = Field(None, alias="InventionName")
+    abstract: str | None = Field(None, alias="Abstract")
+    applicant: str | None = Field(None, alias="Applicant")
+    drawing_path: str | None = Field(None, alias="DrawingPath")
+    thumbnail_path: str | None = Field(None, alias="ThumbnailPath")
+    registration_status: str | None = Field(None, alias="RegistrationStatus")
+
+    model_config = {"populate_by_name": True}
+
+
+class FreeSearchResponse(BaseModel):
+    results: list[FreeSearchResult]
+    docs_start: int
+    total_count: int

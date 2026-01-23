@@ -3,7 +3,7 @@
  */
 
 // 백엔드 없이 프론트엔드 UI 테스트용 모킹 모드
-const MOCK_MODE = process.env.NODE_ENV === 'development' || true // 개발 시 항상 모킹 활성화
+const MOCK_MODE = false
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -16,6 +16,7 @@ export interface Question {
   question: string
   category: string
   hint: string | null
+  choices: string[] | null
 }
 
 export interface AnalyzeResponse {
@@ -38,6 +39,7 @@ export interface Claim {
 
 export interface PatentSpecification {
   title: string
+  title_en: string
   technical_field: string
   background_art: string
   problem_to_solve: string
@@ -67,38 +69,44 @@ export interface SessionStatus {
 const mockQuestions: Question[] = [
   {
     id: "q1",
-    question: "이 발명의 주요 기술적 특징은 무엇입니까?",
-    category: "기술적 특징",
-    hint: "발명의 핵심 기술적 요소를 설명해주세요"
+    question: "이 발명의 주요 기술 분야는 무엇입니까?",
+    category: "기술",
+    hint: "발명의 핵심 기술 분야를 선택하세요",
+    choices: ["AI/머신러닝", "IoT", "클라우드 컴퓨팅", "블록체인", "로봇공학", "기타"]
   },
   {
     id: "q2",
     question: "이 발명의 해결하려는 기술적 문제는 무엇입니까?",
-    category: "문제 해결",
-    hint: "기존 기술의 한계나 해결하고자 하는 문제를 설명해주세요"
+    category: "배경",
+    hint: "기존 기술의 한계나 해결하고자 하는 문제를 설명해주세요",
+    choices: null
   },
   {
     id: "q3",
     question: "이 발명의 독창적인 해결 방법은 무엇입니까?",
-    category: "해결 수단",
-    hint: "기존 기술과 다른 새로운 해결 방법을 설명해주세요"
+    category: "기술",
+    hint: "기존 기술과 다른 새로운 해결 방법을 설명해주세요",
+    choices: null
   },
   {
     id: "q4",
-    question: "이 발명의 기대되는 효과는 무엇입니까?",
-    category: "발명의 효과",
-    hint: "발명이 가져올 기술적, 경제적, 사회적 효과를 설명해주세요"
+    question: "이 발명의 주요 효과는 무엇입니까?",
+    category: "효과",
+    hint: "발명이 가져올 주요 효과를 선택하세요",
+    choices: ["비용 절감", "시간 단축", "품질 향상", "안전성 향상", "편의성 향상", "기타"]
   },
   {
     id: "q5",
     question: "이 발명의 산업적 적용 분야는 어디입니까?",
-    category: "산업적 적용",
-    hint: "발명이 적용될 수 있는 산업 분야를 설명해주세요"
+    category: "적용분야",
+    hint: "발명이 적용될 수 있는 산업 분야를 선택하세요",
+    choices: ["제조", "의료", "통신", "금융", "교육", "농업", "기타"]
   }
 ]
 
 const mockSpecification: PatentSpecification = {
   title: "AI 기반 특허 명세서 자동 생성 시스템 및 방법",
+  title_en: "AI-Based Patent Specification Automatic Generation System and Method",
   technical_field: "컴퓨터 소프트웨어 및 인공지능",
   background_art: `종래의 특허 명세서 작성 방식은 변리사나 전문가가 수작업으로 작성하는 방식이 일반적이었다.
 이러한 방식은 시간과 비용이 많이 소요되며, 전문 지식이 필요한 단점이 있었다.
@@ -295,4 +303,103 @@ export async function getSessionStatus(sessionId: string): Promise<SessionStatus
   }
 
   return response.json()
+}
+
+// ============================================================================
+// SNA Types
+// ============================================================================
+
+export interface SNANode {
+  id: number
+  name: string
+  label: string
+  frequency: number
+}
+
+export interface SNAEdge {
+  source: number
+  target: number
+  weight: number
+}
+
+export interface YearlyData {
+  year: number
+  nodes: SNANode[]
+  edges: SNAEdge[]
+  patent_count: number
+}
+
+export interface SNAResult {
+  nodes: SNANode[]
+  edges: SNAEdge[]
+  total_patents: number
+  code_length: number
+  year_range: [number, number] | null
+  yearly_data: YearlyData[] | null
+}
+
+export interface SNAParams {
+  word: string
+  codeLength?: number
+  pageSize?: number
+  startYear?: number
+  endYear?: number
+  includeYearly?: boolean
+}
+
+// ============================================================================
+// SNA API
+// ============================================================================
+
+export async function analyzeSNA(params: SNAParams): Promise<SNAResult> {
+  const searchParams = new URLSearchParams({
+    word: params.word,
+    code_length: (params.codeLength ?? 4).toString(),
+    page_size: (params.pageSize ?? 500).toString(),
+    include_yearly: (params.includeYearly ?? true).toString(),
+  })
+
+  if (params.startYear) {
+    searchParams.set('start_year', params.startYear.toString())
+  }
+  if (params.endYear) {
+    searchParams.set('end_year', params.endYear.toString())
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/v1/patent/sna/free?${searchParams}`)
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Unknown error' }))
+    throw new Error(error.detail || `HTTP ${response.status}`)
+  }
+
+  return response.json()
+}
+
+/**
+ * Download patent specification as Word document
+ */
+export async function downloadPatentWord(sessionId: string, title: string): Promise<void> {
+  if (MOCK_MODE) {
+    console.log('🎭 [MOCK] Downloading Word document for session:', sessionId)
+    alert('MOCK 모드: 실제 백엔드 연결 시 Word 파일이 다운로드됩니다.')
+    return
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/v1/patent/download/${sessionId}`)
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Unknown error' }))
+    throw new Error(error.detail || `HTTP ${response.status}`)
+  }
+
+  const blob = await response.blob()
+  const url = window.URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${title.replace(/\s+/g, '_')}.docx`
+  document.body.appendChild(a)
+  a.click()
+  window.URL.revokeObjectURL(url)
+  document.body.removeChild(a)
 }

@@ -10,10 +10,13 @@ import {
   Copy,
   Check,
   Sparkles,
+  Download,
+  ExternalLink,
 } from 'lucide-react'
 import {
   analyzeDocument,
   generateSpecification,
+  downloadPatentWord,
   type Question,
   type PatentSpecification,
   type Answer,
@@ -32,6 +35,7 @@ export default function GeneratePage() {
   const [summary, setSummary] = useState<string>('')
   const [questions, setQuestions] = useState<Question[]>([])
   const [answers, setAnswers] = useState<Record<string, string>>({})
+  const [customInputs, setCustomInputs] = useState<Record<string, boolean>>({})
 
   // Result state
   const [specification, setSpecification] = useState<PatentSpecification | null>(null)
@@ -51,7 +55,7 @@ export default function GeneratePage() {
       const result = await analyzeDocument(inputText)
       setSessionId(result.session_id)
       setSummary(result.summary)
-      setQuestions(result.questions)
+      setQuestions(result.questions ?? [])
       setStep('questions')
     } catch (err) {
       setError(err instanceof Error ? err.message : '분석 중 오류가 발생했습니다.')
@@ -83,6 +87,20 @@ export default function GeneratePage() {
 
       const result = await generateSpecification(sessionId, answerList)
       setSpecification(result.specification)
+      
+      // Chrome Extension 연동: Storage에 발명 명칭 저장
+      if (typeof window !== 'undefined' && 'chrome' in window && (window as any).chrome?.storage) {
+        (window as any).chrome.storage.local.set({
+          'patent_invention_names': {
+            korean: result.specification.title,
+            english: result.specification.title_en,
+            timestamp: Date.now(),
+          }
+        }, () => {
+          console.log('Invention names saved to Chrome Storage for Extension')
+        })
+      }
+      
       setStep('result')
     } catch (err) {
       setError(err instanceof Error ? err.message : '명세서 생성 중 오류가 발생했습니다.')
@@ -92,7 +110,6 @@ export default function GeneratePage() {
     }
   }
 
-  // Copy to clipboard
   const handleCopy = async () => {
     if (!specification) return
 
@@ -102,7 +119,16 @@ export default function GeneratePage() {
     setTimeout(() => setCopied(false), 2000)
   }
 
-  // Reset
+  const handleDownloadWord = async () => {
+    if (!sessionId || !specification) return
+
+    try {
+      await downloadPatentWord(sessionId, specification.title)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Word 다운로드 중 오류가 발생했습니다.')
+    }
+  }
+
   const handleReset = () => {
     setStep('input')
     setInputText('')
@@ -110,6 +136,7 @@ export default function GeneratePage() {
     setSummary('')
     setQuestions([])
     setAnswers({})
+    setCustomInputs({})
     setSpecification(null)
     setError(null)
   }
@@ -230,7 +257,7 @@ export default function GeneratePage() {
 
               {/* Questions */}
               <div className="space-y-4">
-                {questions.map((q, idx) => (
+                {(questions ?? []).map((q, idx) => (
                   <div key={q.id} className="rounded-lg border border-border bg-white p-6">
                     <div className="mb-3 flex items-start gap-3">
                       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-white">
@@ -246,14 +273,63 @@ export default function GeneratePage() {
                         )}
                       </div>
                     </div>
-                    <textarea
-                      value={answers[q.id] || ''}
-                      onChange={(e) =>
-                        setAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))
-                      }
-                      placeholder="답변을 입력하세요..."
-                      className="mt-2 h-24 w-full resize-none rounded-lg border border-border p-3 transition-shadow focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                    />
+
+                    {q.choices ? (
+                      <div className="mt-3 space-y-2">
+                        {q.choices.map((choice) => (
+                          <label
+                            key={choice}
+                            className="flex cursor-pointer items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-surface"
+                          >
+                            <input
+                              type="radio"
+                              name={q.id}
+                              value={choice}
+                              checked={
+                                answers[q.id] === choice &&
+                                (choice !== '기타' || !customInputs[q.id])
+                              }
+                              onChange={(e) => {
+                                setAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))
+                                if (choice === '기타') {
+                                  setCustomInputs((prev) => ({ ...prev, [q.id]: true }))
+                                } else {
+                                  setCustomInputs((prev) => ({ ...prev, [q.id]: false }))
+                                }
+                              }}
+                              className="h-4 w-4 text-primary focus:ring-2 focus:ring-primary/20"
+                            />
+                            <span className="text-sm">{choice}</span>
+                          </label>
+                        ))}
+                        {customInputs[q.id] && (
+                          <input
+                            type="text"
+                            value={
+                              answers[q.id] &&
+                              q.choices &&
+                              !q.choices.includes(answers[q.id] || '')
+                                ? answers[q.id]
+                                : ''
+                            }
+                            onChange={(e) =>
+                              setAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))
+                            }
+                            placeholder="직접 입력..."
+                            className="mt-2 w-full rounded-lg border border-border p-3 transition-shadow focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                          />
+                        )}
+                      </div>
+                    ) : (
+                      <textarea
+                        value={answers[q.id] || ''}
+                        onChange={(e) =>
+                          setAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))
+                        }
+                        placeholder="답변을 입력하세요..."
+                        className="mt-2 h-24 w-full resize-none rounded-lg border border-border p-3 transition-shadow focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      />
+                    )}
                   </div>
                 ))}
               </div>
@@ -311,14 +387,30 @@ export default function GeneratePage() {
               animate={{ opacity: 1, y: 0 }}
             >
               {/* Actions */}
-              <div className="mb-6 flex gap-4">
+              <div className="mb-6 flex flex-wrap gap-4">
+                <button
+                  onClick={handleDownloadWord}
+                  className="flex items-center gap-2 rounded-lg bg-primary px-6 py-3 font-semibold text-white transition-all hover:bg-primary-hover"
+                >
+                  <Download className="h-5 w-5" />
+                  Word 다운로드
+                </button>
                 <button
                   onClick={handleCopy}
-                  className="flex items-center gap-2 rounded-lg bg-primary px-6 py-3 font-semibold text-white transition-all hover:bg-primary-hover"
+                  className="flex items-center gap-2 rounded-lg border border-primary bg-white px-6 py-3 font-semibold text-primary transition-all hover:bg-secondary"
                 >
                   {copied ? <Check className="h-5 w-5" /> : <Copy className="h-5 w-5" />}
                   {copied ? '복사됨!' : '전체 복사'}
                 </button>
+                <a
+                  href="https://www.patent.go.kr/smart/portal/Main.do"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 rounded-lg bg-green-600 px-6 py-3 font-semibold text-white transition-all hover:bg-green-700"
+                >
+                  <ExternalLink className="h-5 w-5" />
+                  특허청 출원하기
+                </a>
                 <button
                   onClick={handleReset}
                   className="flex items-center gap-2 rounded-lg bg-secondary px-6 py-3 font-semibold text-text transition-all hover:bg-border"
@@ -330,7 +422,8 @@ export default function GeneratePage() {
               {/* Specification */}
               <div className="space-y-6">
                 <SpecSection title="발명의 명칭" highlight>
-                  <p className="text-xl font-semibold">{specification.title}</p>
+                  <p className="text-xl font-semibold mb-2">{specification.title}</p>
+                  <p className="text-lg text-text-muted">{specification.title_en}</p>
                 </SpecSection>
 
                 <SpecSection title="기술분야" highlight>

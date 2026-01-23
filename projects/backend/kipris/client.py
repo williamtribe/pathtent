@@ -5,7 +5,18 @@ from typing import Self
 
 import httpx
 
-from kipris.models import PatentSearchResult, PDFInfo, SearchParams
+from kipris.models import (
+    PatentSearchResult,
+    PDFInfo,
+    SearchParams,
+    IPCInfo,
+    IPCSearchParams,
+    IPCSearchResult,
+    IPCSearchResponse,
+    FreeSearchParams,
+    FreeSearchResult,
+    FreeSearchResponse,
+)
 
 
 class KIPRISClient:
@@ -109,3 +120,98 @@ class KIPRISClient:
             return None
 
         return PDFInfo(docName=doc_name, path=path)
+
+    async def get_ipc_info(self, application_number: str) -> list[IPCInfo]:
+        query_params = {
+            "applicationNumber": application_number,
+            "accessKey": self._service_key,
+        }
+
+        url = "http://plus.kipris.or.kr/openapi/rest/patUtiModInfoSearchSevice/patentIpcInfo"
+        response = await self._client.get(url, params=query_params)
+        response.raise_for_status()
+
+        root = ET.fromstring(response.text)
+        items = root.findall(".//patentIpcInfo")
+
+        if not items:
+            return []
+
+        results = []
+        for item in items:
+            ipc_code = item.findtext("InternationalpatentclassificationNumber")
+            ipc_date = item.findtext("InternationalpatentclassificationDate")
+
+            if ipc_code:
+                results.append(
+                    IPCInfo(
+                        InternationalpatentclassificationNumber=ipc_code,
+                        InternationalpatentclassificationDate=ipc_date,
+                    )
+                )
+
+        return results
+
+    async def search_by_ipc(self, params: IPCSearchParams) -> IPCSearchResponse:
+        query_params = params.model_dump(by_alias=True, exclude_none=True)
+        query_params["accessKey"] = self._service_key
+
+        url = "http://plus.kipris.or.kr/openapi/rest/patUtiModInfoSearchSevice/ipcSearchInfo"
+        response = await self._client.get(url, params=query_params)
+        response.raise_for_status()
+
+        root = ET.fromstring(response.text)
+
+        total_count_elem = root.find(".//totalSearchCount")
+        total_count = int(total_count_elem.text) if total_count_elem is not None and total_count_elem.text else 0
+
+        docs_start_elem = root.find(".//docsStart")
+        docs_start = int(docs_start_elem.text) if docs_start_elem is not None and docs_start_elem.text else 1
+
+        items = root.findall(".//PatentUtilityInfo")
+
+        if not items:
+            return IPCSearchResponse(results=[], docs_start=docs_start, total_count=total_count)
+
+        results = []
+        for item in items:
+            data = {}
+            for field in item:
+                data[field.tag] = field.text
+
+            result = IPCSearchResult(**data)
+            results.append(result)
+
+        return IPCSearchResponse(results=results, docs_start=docs_start, total_count=total_count)
+
+    async def free_search(self, params: FreeSearchParams) -> FreeSearchResponse:
+        query_params = params.model_dump(by_alias=True, exclude_none=True)
+        query_params["accessKey"] = self._service_key
+
+        url = "http://plus.kipris.or.kr/openapi/rest/patUtiModInfoSearchSevice/freeSearchInfo"
+        response = await self._client.get(url, params=query_params)
+        response.raise_for_status()
+
+        root = ET.fromstring(response.text)
+
+        total_count_elem = root.find(".//totalSearchCount")
+        total_count = int(total_count_elem.text) if total_count_elem is not None and total_count_elem.text else 0
+
+        docs_start_elem = root.find(".//docsStart")
+        docs_start = int(docs_start_elem.text) if docs_start_elem is not None and docs_start_elem.text else 1
+
+        items = root.findall(".//PatentUtilityInfo")
+
+        if not items:
+            return FreeSearchResponse(results=[], docs_start=docs_start, total_count=total_count)
+
+        results = []
+        for item in items:
+            data = {}
+            for field in item:
+                data[field.tag] = field.text
+
+            result = FreeSearchResult(**data)
+            results.append(result)
+
+        return FreeSearchResponse(results=results, docs_start=docs_start, total_count=total_count)
