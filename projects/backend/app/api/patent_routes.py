@@ -30,10 +30,24 @@ from app.services.session_store import session_store
 from app.services.pdf_extractor import PyMuPDFExtractor
 from app.services.word_generator import generate_word_document
 from app.services.chat_refiner import refine_via_chat
-from kipris import KIPRISClient, IPCInfo, IPCSearchParams, IPCSearchResponse, FreeSearchParams, FreeSearchResponse
+from kipris import (
+    KIPRISClient,
+    IPCInfo,
+    IPCSearchParams,
+    IPCSearchResponse,
+    FreeSearchParams,
+    FreeSearchResponse,
+)
 from app.config import Settings
 from app.services.sna_excel_generator import generate_sna_excel
-from app.services.sna_analyzer import analyze_ipc_cooccurrence, SNAResult, PatentRecord, parse_year
+from app.services.sna_analyzer import (
+    analyze_ipc_cooccurrence,
+    SNAResult,
+    PatentRecord,
+    parse_year,
+)
+from app.services.sna_filter import filter_patents_by_similarity
+from app.services.embedding import GeminiEmbeddingService
 from app.repository import bulk_upsert_patents_from_kipris
 
 router = APIRouter(tags=["patent"])
@@ -98,7 +112,9 @@ async def analyze_research_document(request: AnalyzeRequest) -> GenerateResponse
 
     except Exception as e:
         session_store.delete(session.id)
-        raise HTTPException(status_code=500, detail=f"명세서 생성 중 오류 발생: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"명세서 생성 중 오류 발생: {str(e)}"
+        )
 
 
 @router.post("/patent/analyze/pdf", response_model=AnalyzeResponse)
@@ -300,7 +316,9 @@ async def chat_refine_specification(request: ChatRequest) -> ChatResponse:
         )
 
     if not session.specification:
-        raise HTTPException(status_code=400, detail="명세서가 아직 생성되지 않았습니다.")
+        raise HTTPException(
+            status_code=400, detail="명세서가 아직 생성되지 않았습니다."
+        )
 
     spec_data = session.specification
     claims = [
@@ -371,7 +389,9 @@ async def chat_refine_specification(request: ChatRequest) -> ChatResponse:
         )
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"명세서 수정 중 오류 발생: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"명세서 수정 중 오류 발생: {str(e)}"
+        )
 
 
 @router.get("/patent/download/{session_id}")
@@ -453,14 +473,17 @@ async def get_ipc_codes(application_number: str) -> list[IPCInfo]:
     """
     settings = Settings()
     if not settings.kipris_service_key:
-        raise HTTPException(status_code=500, detail="KIPRIS API 키가 설정되지 않았습니다.")
+        raise HTTPException(
+            status_code=500, detail="KIPRIS API 키가 설정되지 않았습니다."
+        )
 
     try:
         async with KIPRISClient(settings.kipris_service_key) as client:
             ipc_list = await client.get_ipc_info(application_number)
             if not ipc_list:
                 raise HTTPException(
-                    status_code=404, detail="해당 출원번호의 IPC 정보를 찾을 수 없습니다."
+                    status_code=404,
+                    detail="해당 출원번호의 IPC 정보를 찾을 수 없습니다.",
                 )
             return ipc_list
     except Exception as e:
@@ -499,10 +522,14 @@ async def search_patents_by_ipc(
     """
     settings = Settings()
     if not settings.kipris_service_key:
-        raise HTTPException(status_code=500, detail="KIPRIS API 키가 설정되지 않았습니다.")
+        raise HTTPException(
+            status_code=500, detail="KIPRIS API 키가 설정되지 않았습니다."
+        )
 
     if page_size > 500:
-        raise HTTPException(status_code=400, detail="페이지당 최대 500건까지 조회 가능합니다.")
+        raise HTTPException(
+            status_code=400, detail="페이지당 최대 500건까지 조회 가능합니다."
+        )
 
     params = IPCSearchParams(
         ipcNumber=ipc_number,
@@ -511,7 +538,9 @@ async def search_patents_by_ipc(
         patent=patent,
         utility=utility,
         lastvalue=status if status in ["", "A", "C", "F", "G", "I", "J", "R"] else None,
-        sortSpec=sort_by if sort_by in ["PD", "AD", "GD", "OPD", "FD", "FOD", "RD"] else None,
+        sortSpec=sort_by
+        if sort_by in ["PD", "AD", "GD", "OPD", "FD", "FOD", "RD"]
+        else None,
         descSort=desc,
     )
 
@@ -549,7 +578,9 @@ async def download_ipc_search_as_excel(
     """
     settings = Settings()
     if not settings.kipris_service_key:
-        raise HTTPException(status_code=500, detail="KIPRIS API 키가 설정되지 않았습니다.")
+        raise HTTPException(
+            status_code=500, detail="KIPRIS API 키가 설정되지 않았습니다."
+        )
 
     if page_size > 500:
         page_size = 500
@@ -561,7 +592,9 @@ async def download_ipc_search_as_excel(
         patent=patent,
         utility=utility,
         lastvalue=status if status in ["", "A", "C", "F", "G", "I", "J", "R"] else None,
-        sortSpec=sort_by if sort_by in ["PD", "AD", "GD", "OPD", "FD", "FOD", "RD"] else None,
+        sortSpec=sort_by
+        if sort_by in ["PD", "AD", "GD", "OPD", "FD", "FOD", "RD"]
+        else None,
         descSort=desc,
     )
 
@@ -627,10 +660,14 @@ async def search_patents_free(
     """
     settings = Settings()
     if not settings.kipris_service_key:
-        raise HTTPException(status_code=500, detail="KIPRIS API 키가 설정되지 않았습니다.")
+        raise HTTPException(
+            status_code=500, detail="KIPRIS API 키가 설정되지 않았습니다."
+        )
 
     if page_size > 500:
-        raise HTTPException(status_code=400, detail="페이지당 최대 500건까지 조회 가능합니다.")
+        raise HTTPException(
+            status_code=400, detail="페이지당 최대 500건까지 조회 가능합니다."
+        )
 
     params = FreeSearchParams(
         word=word,
@@ -639,7 +676,9 @@ async def search_patents_free(
         patent=patent,
         utility=utility,
         lastvalue=status if status in ["", "A", "C", "F", "G", "I", "J", "R"] else None,
-        sortSpec=sort_by if sort_by in ["PD", "AD", "GD", "OPD", "FD", "FOD", "RD"] else None,
+        sortSpec=sort_by
+        if sort_by in ["PD", "AD", "GD", "OPD", "FD", "FOD", "RD"]
+        else None,
         descSort=desc,
     )
 
@@ -677,7 +716,9 @@ async def download_free_search_as_excel(
     """
     settings = Settings()
     if not settings.kipris_service_key:
-        raise HTTPException(status_code=500, detail="KIPRIS API 키가 설정되지 않았습니다.")
+        raise HTTPException(
+            status_code=500, detail="KIPRIS API 키가 설정되지 않았습니다."
+        )
 
     if page_size > 500:
         page_size = 500
@@ -689,7 +730,9 @@ async def download_free_search_as_excel(
         patent=patent,
         utility=utility,
         lastvalue=status if status in ["", "A", "C", "F", "G", "I", "J", "R"] else None,
-        sortSpec=sort_by if sort_by in ["PD", "AD", "GD", "OPD", "FD", "FOD", "RD"] else None,
+        sortSpec=sort_by
+        if sort_by in ["PD", "AD", "GD", "OPD", "FD", "FOD", "RD"]
+        else None,
         descSort=desc,
     )
 
@@ -733,6 +776,8 @@ async def analyze_sna_free_search(
     start_year: int | None = None,
     end_year: int | None = None,
     include_yearly: bool = True,
+    enable_filter: bool = False,
+    min_similarity: float = 0.5,
     db: AsyncSession = Depends(get_db),
 ) -> SNAResult:
     """
@@ -760,10 +805,14 @@ async def analyze_sna_free_search(
     """
     settings = Settings()
     if not settings.kipris_service_key:
-        raise HTTPException(status_code=500, detail="KIPRIS API 키가 설정되지 않았습니다.")
+        raise HTTPException(
+            status_code=500, detail="KIPRIS API 키가 설정되지 않았습니다."
+        )
 
     if code_length not in (4, 8):
-        raise HTTPException(status_code=400, detail="code_length는 4 또는 8이어야 합니다.")
+        raise HTTPException(
+            status_code=400, detail="code_length는 4 또는 8이어야 합니다."
+        )
 
     if page_size > 500:
         page_size = 500
@@ -789,9 +838,37 @@ async def analyze_sna_free_search(
         await bulk_upsert_patents_from_kipris(db, kipris_data)
         await db.commit()
 
+        # 유사도 필터링 적용
+        if enable_filter:
+            filter_settings = Settings()
+            if not filter_settings.google_api_key:
+                raise HTTPException(
+                    status_code=500,
+                    detail="유사도 필터링을 위한 Google API 키가 설정되지 않았습니다.",
+                )
+            embedding_service = GeminiEmbeddingService(
+                api_key=filter_settings.google_api_key,
+                model=filter_settings.gemini_embedding_model,
+            )
+            filtered = await filter_patents_by_similarity(
+                query=word,
+                results=search_result.results,
+                embedding_service=embedding_service,
+                min_similarity=min_similarity,
+            )
+            results_to_analyze = [f.result for f in filtered]
+        else:
+            results_to_analyze = search_result.results
+
+        if not results_to_analyze:
+            raise HTTPException(
+                status_code=404,
+                detail="필터링 후 분석할 특허가 없습니다. min_similarity를 낮춰보세요.",
+            )
+
         patent_records = [
             PatentRecord(ipc=r.ipc_number, year=parse_year(r.application_date))
-            for r in search_result.results
+            for r in results_to_analyze
         ]
         sna_result = analyze_ipc_cooccurrence(
             patent_records,
@@ -839,10 +916,14 @@ async def analyze_sna_ipc_search(
     """
     settings = Settings()
     if not settings.kipris_service_key:
-        raise HTTPException(status_code=500, detail="KIPRIS API 키가 설정되지 않았습니다.")
+        raise HTTPException(
+            status_code=500, detail="KIPRIS API 키가 설정되지 않았습니다."
+        )
 
     if code_length not in (4, 8):
-        raise HTTPException(status_code=400, detail="code_length는 4 또는 8이어야 합니다.")
+        raise HTTPException(
+            status_code=400, detail="code_length는 4 또는 8이어야 합니다."
+        )
 
     if page_size > 500:
         page_size = 500
