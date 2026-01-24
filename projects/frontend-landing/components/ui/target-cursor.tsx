@@ -97,8 +97,10 @@ const TargetCursor: React.FC<TargetCursorProps> = ({
       corners.forEach((corner, i) => {
         const currentX = gsap.getProperty(corner, "x") as number
         const currentY = gsap.getProperty(corner, "y") as number
-        const targetX = targetCornerPositionsRef.current![i].x - cursorX
-        const targetY = targetCornerPositionsRef.current![i].y - cursorY
+        const pos = targetCornerPositionsRef.current?.[i]
+        if (!pos) return
+        const targetX = pos.x - cursorX
+        const targetY = pos.y - cursorY
         const finalX = currentX + (targetX - currentX) * strength
         const finalY = currentY + (targetY - currentY) * strength
         const duration = strength >= 0.99 ? (parallaxOn ? 0.2 : 0) : 0.05
@@ -192,9 +194,11 @@ const TargetCursor: React.FC<TargetCursorProps> = ({
       gsap.to(activeStrengthRef.current, { current: 1, duration: hoverDuration, ease: "power2.out" })
 
       corners.forEach((corner, i) => {
+        const pos = targetCornerPositionsRef.current?.[i]
+        if (!pos) return
         gsap.to(corner, {
-          x: targetCornerPositionsRef.current![i].x - cursorX,
-          y: targetCornerPositionsRef.current![i].y - cursorY,
+          x: pos.x - cursorX,
+          y: pos.y - cursorY,
           duration: 0.2,
           ease: "power2.out",
         })
@@ -218,7 +222,9 @@ const TargetCursor: React.FC<TargetCursorProps> = ({
           ]
           const tl = gsap.timeline()
           corners.forEach((corner, index) => {
-            tl.to(corner, { x: positions[index].x, y: positions[index].y, duration: 0.3, ease: "power3.out" }, 0)
+            const pos = positions[index]
+            if (!pos) return
+            tl.to(corner, { x: pos.x, y: pos.y, duration: 0.3, ease: "power3.out" }, 0)
           })
         }
         resumeTimeout = setTimeout(() => {

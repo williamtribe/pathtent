@@ -24,8 +24,37 @@
     --font-inter: var(--font-inter);
     --font-ibm-plex-sans: var(--font-ibm-plex-sans);
   }
-  
+
+  html {
+    scroll-behavior: smooth;
+  }
+
   body {
     @apply antialiased;
+  }
+
+  /* Custom scrollbar - Webkit (Chrome, Safari, Edge) */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.35);
+  }
+
+  /* Custom scrollbar - Firefox */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
   }
 }

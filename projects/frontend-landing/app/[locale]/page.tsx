@@ -1,164 +1,166 @@
-'use client'
+"use client"
 
-import { motion, Variants } from 'motion/react'
-import { useTranslations } from 'next-intl'
-import { Link } from '@/i18n/routing'
-import { ArrowRight, Check, Search, Database, Cpu, FileText } from 'lucide-react'
-
-const containerVariants: Variants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.1,
-      delayChildren: 0.2,
-    },
-  },
-}
-
-const itemVariants: Variants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 100 } },
-}
+import { motion } from "motion/react"
+import { Link } from "@/i18n/routing"
+import { ArrowRight } from "lucide-react"
+import Threads from "@/components/ui/threads"
+import TargetCursor from "@/components/ui/target-cursor"
+import TextType from "@/components/ui/text-type"
 
 export default function Home() {
-  const t = useTranslations('home')
-
   return (
-    <main className="min-h-screen w-full overflow-x-hidden bg-white text-text">
-      {/* Hero Section */}
-      <section className="relative flex flex-col items-center justify-center border-b border-border bg-white px-6 py-24 text-center md:py-32">
-        <motion.div
-          initial="hidden"
-          animate="visible"
-          variants={containerVariants}
-          className="relative z-10 max-w-4xl"
-        >
+    <>
+      <TargetCursor targetSelector=".cursor-target" />
+
+      <main className="min-h-screen w-full overflow-x-hidden bg-black text-white">
+        {/* Hero Section - Full viewport */}
+        <section className="relative flex min-h-screen flex-col items-center justify-center px-6">
+          {/* Threads Background */}
+          <div className="pointer-events-none absolute inset-0 -translate-y-[12.5%] opacity-40">
+            <Threads color={[0.18, 0.34, 0.99]} amplitude={2} distance={0.3} />
+          </div>
+
+          {/* Hero Content */}
           <motion.div
-            variants={itemVariants}
-            className="mb-6 inline-block rounded-full bg-secondary px-4 py-2 text-sm font-semibold text-primary"
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
+            className="relative z-10 max-w-5xl text-center"
           >
-            New: Gemini 2.0 Integration
+            <h1 className="mb-8 text-6xl font-bold tracking-tight md:text-8xl lg:text-9xl">
+              Pathtent
+            </h1>
+
+            <p className="mx-auto mb-12 max-w-2xl text-xl text-white/60 md:text-2xl">
+              AI-powered patent drafting. From idea to filing, simplified.
+            </p>
+
+            <Link href="/generate">
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="cursor-target inline-flex items-center gap-3 rounded-full bg-white px-8 py-4 text-lg font-semibold text-black transition-all hover:bg-white/90"
+              >
+                Start Creating <ArrowRight className="h-5 w-5" />
+              </motion.button>
+            </Link>
           </motion.div>
 
-          <motion.h1
-            variants={itemVariants}
-            className="mb-6 text-5xl font-bold leading-tight tracking-tight md:text-6xl lg:text-7xl"
+          {/* Scroll indicator */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1.5, duration: 1 }}
+            className="absolute bottom-12 left-1/2 -translate-x-1/2"
           >
-            {t.rich('hero.title', { br: () => <br /> })}
-          </motion.h1>
+            <motion.div
+              animate={{ y: [0, 8, 0] }}
+              transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+              className="h-12 w-6 rounded-full border-2 border-white/30"
+            >
+              <motion.div
+                animate={{ y: [0, 16, 0] }}
+                transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                className="mx-auto mt-2 h-2 w-1 rounded-full bg-white/50"
+              />
+            </motion.div>
+          </motion.div>
+        </section>
 
-          <motion.p
-            variants={itemVariants}
-            className="mx-auto mb-10 max-w-2xl text-xl text-text-muted md:text-2xl"
+        {/* Tagline Section - Typing Animation */}
+        <section className="flex min-h-screen flex-col items-center justify-center bg-black px-6">
+          <div className="max-w-5xl text-center">
+            <TextType
+              text="Revolutionizing Revolutions."
+              as="h2"
+              className="text-5xl font-bold tracking-tight text-white md:text-7xl lg:text-8xl"
+              typingSpeed={80}
+              showCursor={true}
+              cursorCharacter="_"
+              cursorClassName="text-primary"
+              loop={false}
+              startOnVisible={true}
+              initialDelay={300}
+            />
+
+            <motion.p
+              initial={{ opacity: 0 }}
+              whileInView={{ opacity: 1 }}
+              viewport={{ once: true }}
+              transition={{ delay: 3, duration: 1 }}
+              className="mt-12 text-xl text-white/50 md:text-2xl"
+            >
+              Patents are the backbone of innovation. We make them accessible.
+            </motion.p>
+          </div>
+        </section>
+
+        {/* Problem Statement */}
+        <section className="flex min-h-[70vh] flex-col items-center justify-center bg-black px-6 py-24">
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.8 }}
+            className="max-w-4xl text-center"
           >
-            {t('hero.subtitle')}
-          </motion.p>
+            <p className="mb-4 text-sm font-medium uppercase tracking-widest text-primary">
+              The Problem
+            </p>
+            <h3 className="text-3xl font-medium leading-relaxed text-white/80 md:text-4xl lg:text-5xl">
+              Patent drafting is{" "}
+              <span className="text-white">complex</span>,{" "}
+              <span className="text-white">expensive</span>, and{" "}
+              <span className="text-white">time-consuming</span>.
+            </h3>
+          </motion.div>
+        </section>
 
-          <Link href="/generate">
-            <motion.button
-              variants={itemVariants}
-              whileHover={{ y: -2 }}
-              whileTap={{ scale: 0.98 }}
-              className="inline-flex items-center gap-2 rounded-lg bg-primary px-8 py-4 text-lg font-semibold text-white transition-all hover:bg-primary-hover"
-            >
-              {t('hero.cta')} <ArrowRight className="h-5 w-5" />
-            </motion.button>
-          </Link>
-        </motion.div>
-      </section>
+        {/* Solution Statement */}
+        <section className="flex min-h-[70vh] flex-col items-center justify-center bg-black px-6 py-24">
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.8 }}
+            className="max-w-4xl text-center"
+          >
+            <p className="mb-4 text-sm font-medium uppercase tracking-widest text-primary">
+              The Solution
+            </p>
+            <h3 className="text-3xl font-medium leading-relaxed text-white/80 md:text-4xl lg:text-5xl">
+              <span className="text-white">AI</span> that understands patents.
+              <br />
+              <span className="text-white">Automation</span> that saves weeks.
+              <br />
+              <span className="text-white">Quality</span> you can trust.
+            </h3>
+          </motion.div>
+        </section>
 
-      {/* How It Works Section */}
-      <section className="border-b border-border bg-surface px-6 py-20">
-        <div className="mx-auto max-w-7xl">
-          <div className="mb-16 text-center">
-            <h2 className="text-4xl font-bold md:text-5xl">{t('howItWorks.title')}</h2>
-          </div>
+        {/* CTA Section */}
+        <section className="flex min-h-[60vh] flex-col items-center justify-center bg-gradient-to-t from-primary/20 to-black px-6 py-24">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+            className="text-center"
+          >
+            <h2 className="mb-8 text-4xl font-bold md:text-6xl">Ready to innovate?</h2>
 
-          <div className="grid gap-8 md:grid-cols-3 lg:grid-cols-5">
-            {[1, 2, 3, 4, 5].map((step, index) => (
-              <motion.div
-                key={step}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.1 }}
-                className="relative flex flex-col rounded-lg border border-border bg-white p-6"
+            <Link href="/generate">
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="cursor-target inline-flex items-center gap-3 rounded-full bg-primary px-10 py-5 text-xl font-semibold text-white transition-all hover:bg-primary-hover"
               >
-                <div className="absolute -top-4 left-1/2 flex h-8 w-8 -translate-x-1/2 items-center justify-center rounded-full bg-primary text-sm font-semibold text-white">
-                  {step}
-                </div>
-                <div className="mt-4 flex flex-1 flex-col items-center text-center">
-                  <div className="mb-4 rounded-lg bg-secondary p-3">
-                    {step === 1 && <FileText size={28} className="text-primary" />}
-                    {step === 2 && <Cpu size={28} className="text-primary" />}
-                    {step === 3 && <Search size={28} className="text-primary" />}
-                    {step === 4 && <Database size={28} className="text-primary" />}
-                    {step === 5 && <Check size={28} className="text-primary" />}
-                  </div>
-                  <h3 className="mb-2 text-lg font-semibold">{t(`howItWorks.step${step}.title`)}</h3>
-                  <p className="text-sm text-text-muted">{t(`howItWorks.step${step}.desc`)}</p>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Features Section */}
-      <section className="bg-white px-6 py-20">
-        <div className="mx-auto max-w-7xl">
-          <h2 className="mb-16 text-center text-4xl font-bold md:text-5xl">{t('features.title')}</h2>
-
-          <div className="grid gap-6 md:grid-cols-2">
-            {[
-              { id: 'feature1', icon: Cpu },
-              { id: 'feature2', icon: FileText },
-              { id: 'feature3', icon: Database },
-              { id: 'feature4', icon: Search },
-            ].map((feature, idx) => (
-              <motion.div
-                key={feature.id}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: idx * 0.1 }}
-                whileHover={{ y: -4 }}
-                className="flex items-start gap-6 rounded-lg border border-border bg-white p-8 transition-all hover:border-primary"
-              >
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-secondary">
-                  <feature.icon size={28} className="text-primary" strokeWidth={2} />
-                </div>
-                <div>
-                  <h3 className="mb-2 text-xl font-semibold">{t(`features.${feature.id}`)}</h3>
-                  <p className="text-text-muted">KIPRIS API & Gemini</p>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="border-t border-border bg-surface py-24 text-center">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="mx-auto max-w-4xl px-6"
-        >
-          <h2 className="mb-8 text-4xl font-bold md:text-5xl">{t('ctaSection.title')}</h2>
-          <Link href="/generate">
-            <motion.button
-              whileHover={{ y: -2 }}
-              whileTap={{ scale: 0.98 }}
-              className="inline-block rounded-lg bg-primary px-10 py-5 text-lg font-semibold text-white transition-all hover:bg-primary-hover"
-            >
-              {t('ctaSection.button')}
-            </motion.button>
-          </Link>
-        </motion.div>
-      </section>
-    </main>
+                Get Started <ArrowRight className="h-6 w-6" />
+              </motion.button>
+            </Link>
+          </motion.div>
+        </section>
+      </main>
+    </>
   )
 }

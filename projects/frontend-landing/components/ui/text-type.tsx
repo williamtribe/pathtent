@@ -112,7 +112,7 @@ const TextType = ({
 
     let timeout: ReturnType<typeof setTimeout>
 
-    const currentText = textArray[currentTextIndex]
+    const currentText = textArray[currentTextIndex] ?? ""
     const processedText = reverseMode ? currentText.split("").reverse().join("") : currentText
 
     const executeTypingAnimation = () => {
@@ -123,7 +123,7 @@ const TextType = ({
             return
           }
 
-          if (onSentenceComplete) {
+          if (onSentenceComplete && textArray[currentTextIndex]) {
             onSentenceComplete(textArray[currentTextIndex], currentTextIndex)
           }
 
@@ -179,7 +179,7 @@ const TextType = ({
   ])
 
   const shouldHideCursor =
-    hideCursorWhileTyping && (currentCharIndex < textArray[currentTextIndex].length || isDeleting)
+    hideCursorWhileTyping && (currentCharIndex < (textArray[currentTextIndex]?.length ?? 0) || isDeleting)
 
   return createElement(
     Component,
