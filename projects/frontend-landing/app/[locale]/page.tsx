@@ -12,7 +12,7 @@ export default function Home() {
     <>
       <TargetCursor targetSelector=".cursor-target" />
 
-      <main className="min-h-screen w-full overflow-x-hidden bg-gradient-to-b from-white via-indigo-50/30 to-indigo-100 text-text">
+      <main className="min-h-screen w-full overflow-x-hidden bg-gradient-to-b from-white to-primary/30 text-text">
         {/* Hero Section - Full viewport */}
         <section className="relative flex min-h-screen flex-col items-center justify-center px-6">
           {/* Threads Background - aligned with Pathtent text */}
@@ -117,7 +117,7 @@ export default function Home() {
         </section>
 
         {/* CTA Section */}
-        <section className="flex min-h-[60vh] flex-col items-center justify-center bg-gradient-to-t from-primary/10 to-white px-6 py-24">
+        <section className="flex min-h-[60vh] flex-col items-center justify-center px-6 py-24">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             whileInView={{ opacity: 1, scale: 1 }}
@@ -125,7 +125,7 @@ export default function Home() {
             transition={{ duration: 0.6 }}
             className="text-center"
           >
-            <h2 className="mb-8 text-4xl font-bold text-text md:text-6xl">Ready to innovate?</h2>
+            <h2 className="mb-8 text-4xl font-bold text-white md:text-6xl">Ready to innovate?</h2>
 
             <Link href="/generate">
               <motion.button

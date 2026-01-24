@@ -51,7 +51,7 @@ const ScrollTyping = ({
   return (
     <div
       ref={containerRef}
-      className="flex min-h-screen items-center justify-center bg-gradient-to-b from-transparent via-indigo-50/50 to-indigo-100/70 px-6"
+      className="flex min-h-screen items-center justify-center px-6"
     >
       <div ref={textRef} className="max-w-5xl text-center">
         <span className={className}>
