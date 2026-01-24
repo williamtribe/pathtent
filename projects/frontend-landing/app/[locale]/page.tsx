@@ -14,8 +14,8 @@ export default function Home() {
       <TargetCursor targetSelector=".cursor-target" />
 
       <main className="relative min-h-screen w-full overflow-x-hidden bg-gradient-to-b from-white to-sky-100 text-text">
-        {/* Vertical center line */}
-        <div className="pointer-events-none fixed left-1/2 top-0 h-full w-px -translate-x-1/2 bg-black/20" />
+        {/* Vertical center line - starts after hero, behind content */}
+        <div className="pointer-events-none absolute left-1/2 top-[100vh] z-0 h-[calc(100%-100vh)] w-1 -translate-x-1/2 bg-black" />
         {/* Hero Section - Full viewport */}
         <section className="relative flex min-h-screen flex-col items-center justify-center px-6">
           {/* Threads Background - aligned with Pathtent text */}
