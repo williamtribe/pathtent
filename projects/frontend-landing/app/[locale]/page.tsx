@@ -8,14 +8,17 @@ import TargetCursor from "@/components/ui/target-cursor"
 import ScrollTyping from "@/components/ui/scroll-typing"
 import FadeContent from "@/components/ui/fade-content"
 
+// Vertical line segment component
+const VerticalLine = ({ className = "" }: { className?: string }) => (
+  <div className={`mx-auto h-32 w-0.5 bg-black ${className}`} />
+)
+
 export default function Home() {
   return (
     <>
       <TargetCursor targetSelector=".cursor-target" />
 
-      <main className="relative min-h-screen w-full overflow-x-hidden bg-gradient-to-b from-white to-sky-100 text-text">
-        {/* Vertical center line - starts after hero, behind content */}
-        <div className="pointer-events-none absolute left-1/2 top-[100vh] z-0 h-[calc(100%-100vh)] w-1 -translate-x-1/2 bg-black" />
+      <main className="relative min-h-screen w-full overflow-x-hidden bg-gradient-to-b from-white to-sky-200 text-text">
         {/* Hero Section - Full viewport */}
         <section className="relative flex min-h-screen flex-col items-center justify-center px-6">
           {/* Threads Background - aligned with Pathtent text */}
@@ -70,11 +73,17 @@ export default function Home() {
           </motion.div>
         </section>
 
+        {/* Line: Hero → Typing */}
+        <VerticalLine />
+
         {/* Tagline Section - Scroll-hijacked Typing Animation */}
         <ScrollTyping
           text="Revolutionizing Revolutions."
           className="text-5xl font-bold tracking-tight text-text md:text-7xl lg:text-8xl"
         />
+
+        {/* Line: Typing → Problem */}
+        <VerticalLine />
 
         {/* Problem Statement */}
         <section className="flex min-h-[70vh] flex-col items-center justify-center px-6 py-24">
@@ -90,6 +99,9 @@ export default function Home() {
             </FadeContent>
           </div>
         </section>
+
+        {/* Line: Problem → Solution */}
+        <VerticalLine />
 
         {/* Solution Statement */}
         <section className="flex min-h-[70vh] flex-col items-center justify-center px-6 py-24">
@@ -110,6 +122,9 @@ export default function Home() {
             </div>
           </div>
         </section>
+
+        {/* Line: Solution → CTA */}
+        <VerticalLine />
 
         {/* CTA Section */}
         <section className="flex min-h-[60vh] flex-col items-center justify-center px-6 py-24">
