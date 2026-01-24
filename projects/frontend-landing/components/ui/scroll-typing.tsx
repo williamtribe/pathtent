@@ -30,9 +30,9 @@ const ScrollTyping = ({
     const trigger = ScrollTrigger.create({
       trigger: containerRef.current,
       start: "top top",
-      end: `+=${totalChars * 30}`, // 30px per character = faster scroll
+      end: `+=${totalChars * 18}`, // 18px per character = even faster
       pin: true,
-      scrub: 0.3,
+      scrub: 0.2,
       onUpdate: (self) => {
         const progress = self.progress
         const charIndex = Math.floor(progress * totalChars)
@@ -46,41 +46,34 @@ const ScrollTyping = ({
     }
   }, [text])
 
+  const isComplete = visibleChars >= text.length
+
   return (
-    <div ref={containerRef} className="flex min-h-screen items-center justify-center px-6">
+    <div
+      ref={containerRef}
+      className="flex min-h-screen items-center justify-center bg-gradient-to-b from-transparent via-indigo-50/50 to-indigo-100/70 px-6"
+    >
       <div ref={textRef} className="max-w-5xl text-center">
         <span className={className}>
           {text.split("").map((char, index) => {
             const isVisible = index < visibleChars
             const isActive = index === activeCharIndex
-            const showCursor = index === visibleChars - 1 && visibleChars < text.length
 
             return (
-              <span key={index} className="relative">
-                <span
-                  style={{
-                    opacity: isVisible ? 1 : 0,
-                    color: isActive ? activeColor : "inherit",
-                    transition: "color 0.3s ease",
-                  }}
-                >
-                  {char}
-                </span>
-                {showCursor && (
-                  <span
-                    className="absolute -right-1 text-primary"
-                    style={{
-                      animation: "blink 0.8s infinite",
-                    }}
-                  >
-                    _
-                  </span>
-                )}
+              <span
+                key={index}
+                style={{
+                  opacity: isVisible ? 1 : 0,
+                  color: isActive ? activeColor : "inherit",
+                  transition: "color 0.3s ease",
+                }}
+              >
+                {char}
               </span>
             )
           })}
-          {/* Initial cursor when no chars typed */}
-          {visibleChars === 0 && (
+          {/* Cursor at next character position */}
+          {!isComplete && (
             <span
               className="text-primary"
               style={{
