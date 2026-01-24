@@ -377,56 +377,54 @@ export async function analyzeSNA(params: SNAParams): Promise<SNAResult> {
 }
 
 // ============================================================================
-// Formula Types & API Functions
+// Formula Generator Types
 // ============================================================================
 
-export interface FormulaOptions {
-  target_precision?: "high" | "balanced" | "recall"
-  include_synonyms?: boolean
-  include_ipc?: boolean
+export interface IpcCode {
+  code: string
+  description: string
+  level: string
+  score: number
 }
 
 export interface FormulaResult {
   formula: string
   keywords: string[]
   synonyms: Record<string, string[]>
-  ipc_codes: string[]
   excluded_terms: string[]
+  ipc_codes: IpcCode[]
   explanation: string
   tips: string[]
 }
 
-export interface FormulaGenerateRequest {
-  text: string
-  options?: FormulaOptions
-}
-
-export interface FormulaImproveRequest {
+export interface ImproveFormulaParams {
   original_formula: string
   original_keywords: string[]
   original_synonyms: Record<string, string[]>
-  feedback: "too_many" | "too_few" | "noisy"
+  original_excluded_terms: string[]
+  feedback: 'too_many' | 'too_few' | 'noisy'
   result_count?: number
   additional_context?: string
 }
 
+// ============================================================================
+// Formula Generator API
+// ============================================================================
+
 /**
- * Generate KIPRIS search formula from invention description
+ * Generate patent search formula from invention description
  */
-export async function generateFormula(
-  text: string,
-  options?: FormulaOptions
-): Promise<FormulaResult> {
-  const response = await fetch(`${API_BASE_URL}/api/v1/formula/generate`, {
-    method: "POST",
+export async function generateFormula(text: string): Promise<FormulaResult> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/patent/formula/generate`, {
+    method: 'POST',
     headers: {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ text, options }),
+    body: JSON.stringify({ text }),
   })
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: "Unknown error" }))
+    const error = await response.json().catch(() => ({ detail: 'Unknown error' }))
     throw new Error(error.detail || `HTTP ${response.status}`)
   }
 
@@ -434,35 +432,33 @@ export async function generateFormula(
 }
 
 /**
- * Improve existing KIPRIS search formula based on feedback
+ * Improve existing formula based on feedback
  */
 export async function improveFormula(
   originalFormula: string,
   originalKeywords: string[],
   originalSynonyms: Record<string, string[]>,
-  feedback: "too_many" | "too_few" | "noisy",
-  resultCount?: number,
-  additionalContext?: string
+  originalExcludedTerms: string[],
+  feedback: 'too_many' | 'too_few' | 'noisy',
+  additionalContext?: string,
 ): Promise<FormulaResult> {
-  const request: FormulaImproveRequest = {
-    original_formula: originalFormula,
-    original_keywords: originalKeywords,
-    original_synonyms: originalSynonyms,
-    feedback,
-    result_count: resultCount,
-    additional_context: additionalContext,
-  }
-
-  const response = await fetch(`${API_BASE_URL}/api/v1/formula/improve`, {
-    method: "POST",
+  const response = await fetch(`${API_BASE_URL}/api/v1/patent/formula/improve`, {
+    method: 'POST',
     headers: {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
     },
-    body: JSON.stringify(request),
+    body: JSON.stringify({
+      original_formula: originalFormula,
+      original_keywords: originalKeywords,
+      original_synonyms: originalSynonyms,
+      original_excluded_terms: originalExcludedTerms,
+      feedback,
+      additional_context: additionalContext,
+    }),
   })
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: "Unknown error" }))
+    const error = await response.json().catch(() => ({ detail: 'Unknown error' }))
     throw new Error(error.detail || `HTTP ${response.status}`)
   }
 

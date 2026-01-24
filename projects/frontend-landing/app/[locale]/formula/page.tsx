@@ -76,9 +76,9 @@ export default function FormulaPage() {
         result.formula,
         result.keywords,
         result.synonyms,
+        result.excluded_terms,
         selectedFeedback,
-        resultCount ? parseInt(resultCount, 10) : undefined,
-        additionalContext || undefined
+        additionalContext || undefined,
       )
       setResult(improvedResult)
       setShowFeedback(false)
@@ -380,18 +380,6 @@ export default function FormulaPage() {
                           animate={{ opacity: 1 }}
                           className="space-y-3"
                         >
-                          <div>
-                            <label className="mb-1 block text-sm font-medium">
-                              검색 결과 수 (선택사항)
-                            </label>
-                            <input
-                              type="number"
-                              value={resultCount}
-                              onChange={(e) => setResultCount(e.target.value)}
-                              placeholder="예: 1500"
-                              className="w-full rounded-lg border border-border p-3 transition-shadow focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                            />
-                          </div>
                           <div>
                             <label className="mb-1 block text-sm font-medium">
                               추가 요청사항 (선택사항)

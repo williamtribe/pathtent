@@ -51,6 +51,7 @@ async def improve_search_formula(request: FormulaImproveRequest) -> FormulaResul
             original_formula=request.original_formula,
             original_keywords=request.original_keywords,
             original_synonyms=request.original_synonyms,
+            original_excluded_terms=request.original_excluded_terms,
             feedback=request.feedback,
             result_count=request.result_count,
             additional_context=request.additional_context,

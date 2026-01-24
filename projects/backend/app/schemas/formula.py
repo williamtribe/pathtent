@@ -50,6 +50,10 @@ class FormulaImproveRequest(BaseModel):
         ...,
         description="Synonym mappings from the original formula generation",
     )
+    original_excluded_terms: list[str] = Field(
+        default_factory=list,
+        description="Excluded terms from the original formula generation",
+    )
     feedback: str = Field(
         ...,
         description="User feedback: 'too_many' (too many results), 'too_few' (too few results), 'noisy' (irrelevant results)",

@@ -2,8 +2,7 @@
 """
 Build IPC embeddings database using Gemini.
 
-@TODO-2 — IPC description embedding script
-
+Embeds Korean IPC descriptions for semantic search.
 Concurrent + robust:
 - ~30-40 req/sec
 - Retry on network errors

@@ -41,5 +41,5 @@ app.include_router(search_router, prefix="/api/v1")
 # 새로운 특허 명세서 생성 API (DB 불필요)
 app.include_router(patent_router, prefix="/api/v1")
 
-# KIPRIS 검색식 생성 API
-app.include_router(formula_router, prefix="/api/v1")
+# 검색식 생성 API
+app.include_router(formula_router, prefix="/api/v1/patent")

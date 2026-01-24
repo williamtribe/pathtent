@@ -1,71 +1,79 @@
 #!/usr/bin/env python3
 """
-Build IPC database from WIPO XML file.
+Build IPC database from Korean CSV files.
 
-@TODO-1 — IPC XML parsing and JSON export script
-
-This script parses the WIPO IPC scheme XML file and exports
-searchable IPC codes (subclass + main group levels) to JSON.
+This script parses Korean IPC CSV files (subclass + main group)
+and exports to JSON for embedding-based search.
 
 Usage:
     python scripts/build_ipc_db.py
 
 Output:
-    data/ipc_codes.json - IPC codes with descriptions (~8,000 entries)
+    data/ipc_codes.json - IPC codes with Korean descriptions
 """
 
+import csv
 import json
 import os
 from pathlib import Path
 
-from ipc_parser.parser import IpcParser
 
-
-def build_ipc_database(xml_path: str, output_path: str) -> dict:
+def build_ipc_database(
+    subclass_csv: str,
+    maingroup_csv: str,
+    output_path: str,
+) -> dict:
     """
-    Parse WIPO IPC XML and extract searchable codes.
+    Parse Korean IPC CSV files and build JSON database.
 
     Args:
-        xml_path: Path to WIPO IPC scheme XML file
+        subclass_csv: Path to IPC subclass CSV (4-digit codes)
+        maingroup_csv: Path to IPC main group CSV (7-digit codes)
         output_path: Path to output JSON file
 
     Returns:
         Statistics about the parsed data
     """
-    print(f"Parsing {xml_path}...")
-    ipc = IpcParser(ipc_xml=xml_path)
-    df = ipc.get_dataframe()
+    ipc_codes: dict[str, dict] = {}
 
-    print(f"Total entries in XML: {len(df)}")
+    # 1. Parse subclass CSV (e.g., A01B -> "Soil-working in agriculture...")
+    print("Parsing subclass CSV...")
+    with open(subclass_csv, encoding="utf-8-sig") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            code = row["IPC subclass"].strip()
+            description = row["Label"].strip()
 
-    # Filter for searchable levels:
-    # - 'u' = subclass (e.g., A01B, B60T) - ~651 entries
-    # - 'm' = main group (e.g., A01B 1/00, B60T 7/00) - ~7,597 entries
-    searchable_kinds = ["u", "m"]
-    searchable_df = df[df["kind"].isin(searchable_kinds)].copy()
+            ipc_codes[code] = {
+                "code": code,
+                "description": description,
+                "parent_code": None,  # Subclass has no parent in our hierarchy
+                "level": "subclass",
+            }
 
-    print(f"Searchable entries (subclass + main group): {len(searchable_df)}")
+    subclass_count = len(ipc_codes)
+    print(f"  Loaded {subclass_count} subclasses")
 
-    # Build structured data
-    ipc_codes = {}
-    for _, row in searchable_df.iterrows():
-        code = row["code"].strip()
-        description = row["description"].strip()
+    # 2. Parse main group CSV (e.g., A01B-001 -> "Hand tools for agriculture...")
+    print("Parsing main group CSV...")
+    with open(maingroup_csv, encoding="utf-8-sig") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            code = row["IPC maingroup"].strip()
+            description = row["Label"].strip()
 
-        # Get parent code from parent list
-        parent_list = row["parent"]
-        parent_code = parent_list[-1] if parent_list else None
+            # Extract parent subclass (A01B-001 -> A01B)
+            parent_code = code.split("-")[0] if "-" in code else None
 
-        # Determine level
-        level = "subclass" if row["kind"] == "u" else "main_group"
+            ipc_codes[code] = {
+                "code": code,
+                "description": description,
+                "parent_code": parent_code,
+                "level": "main_group",
+            }
 
-        ipc_codes[code] = {
-            "code": code,
-            "description": description,
-            "description_ko": None,  # To be filled with Korean translations
-            "parent_code": parent_code,
-            "level": level,
-        }
+    maingroup_count = len(ipc_codes) - subclass_count
+    print(f"  Loaded {maingroup_count} main groups")
 
     # Save to JSON
     output_dir = os.path.dirname(output_path)
@@ -75,37 +83,38 @@ def build_ipc_database(xml_path: str, output_path: str) -> dict:
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(ipc_codes, f, ensure_ascii=False, indent=2)
 
-    print(f"Saved {len(ipc_codes)} IPC codes to {output_path}")
+    print(f"\nSaved {len(ipc_codes)} IPC codes to {output_path}")
 
-    # Statistics
     stats = {
-        "total_entries": len(df),
-        "searchable_entries": len(ipc_codes),
-        "subclass_count": len(
-            [c for c in ipc_codes.values() if c["level"] == "subclass"]
-        ),
-        "main_group_count": len(
-            [c for c in ipc_codes.values() if c["level"] == "main_group"]
-        ),
+        "total_entries": len(ipc_codes),
+        "subclass_count": subclass_count,
+        "main_group_count": maingroup_count,
     }
 
     return stats
 
 
 def main():
-    # Paths
-    project_root = Path(__file__).parent.parent.parent.parent  # pathtent/
-    xml_path = project_root / "data" / "ipc" / "EN_ipc_scheme_20240101.xml"
-    output_path = Path(__file__).parent.parent / "data" / "ipc_codes.json"
+    data_dir = Path(__file__).parent.parent / "data"
 
-    if not xml_path.exists():
-        print(f"Error: IPC XML file not found at {xml_path}")
-        print(
-            "Please download from: https://www.wipo.int/ipc/itos4ipc/ITSupport_and_download_area/"
-        )
+    subclass_csv = data_dir / "IPC서브클래스_4자리.csv"
+    maingroup_csv = data_dir / "IPC메인그룹_7자리.csv"
+    output_path = data_dir / "ipc_codes.json"
+
+    # Check files exist
+    if not subclass_csv.exists():
+        print("Error: Subclass CSV not found")
         return
 
-    stats = build_ipc_database(str(xml_path), str(output_path))
+    if not maingroup_csv.exists():
+        print("Error: Main group CSV not found")
+        return
+
+    stats = build_ipc_database(
+        str(subclass_csv),
+        str(maingroup_csv),
+        str(output_path),
+    )
 
     print("\nStatistics:")
     for key, value in stats.items():

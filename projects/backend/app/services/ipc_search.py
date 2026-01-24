@@ -1,25 +1,20 @@
 """
 IPC Search Service - Embedding-based IPC code lookup.
 
-@TODO-3 — IPC embedding search service
-
 This service provides grounded IPC code recommendations
-by searching pre-computed embeddings instead of AI generation.
+by searching pre-computed Korean embeddings.
 
 Usage:
     service = IpcSearchService(api_key="...")
-    results = await service.search("전기차 배터리 냉각 시스템", top_k=5)
-    # Returns: [IpcSearchResult(code="H01M 10/60", description="...", score=0.85), ...]
+    results = await service.search("EV battery cooling system", top_k=5)
+    # Returns: [IpcSearchResult(code="H01M-010", description="...", score=0.85), ...]
 """
 
-import asyncio
 import json
-import re
 from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
-from google import genai
 
 from app.config import Settings
 from app.services.embedding import GeminiEmbeddingService
@@ -30,26 +25,17 @@ class IpcSearchResult:
     """Single IPC search result."""
 
     code: str
-    description: str
-    description_ko: str | None
+    description: str  # Korean description
     level: str  # "subclass" or "main_group"
     score: float  # cosine similarity score
-
-
-def _contains_korean(text: str) -> bool:
-    """Check if text contains Korean characters."""
-    return bool(re.search(r"[\uac00-\ud7af\u1100-\u11ff\u3130-\u318f]", text))
 
 
 class IpcSearchService:
     """
     Embedding-based IPC code search service.
 
-    Loads pre-computed IPC embeddings and performs cosine similarity
+    Loads pre-computed Korean IPC embeddings and performs cosine similarity
     search to find relevant IPC codes for a given invention description.
-
-    Korean queries are automatically translated to English for better
-    cross-lingual alignment with the English IPC descriptions.
     """
 
     def __init__(
@@ -91,30 +77,6 @@ class IpcSearchService:
         # Embedding service for queries
         self.embedding_service = GeminiEmbeddingService(api_key=api_key)
 
-        # Gemini client for translation
-        self.genai_client = genai.Client(api_key=api_key)
-
-    async def _translate_to_english(self, text: str) -> str:
-        """Translate Korean text to English for better embedding alignment."""
-        if not _contains_korean(text):
-            return text
-
-        prompt = f"""Translate the following Korean technical/patent description to English.
-Keep technical terms accurate. Output ONLY the English translation, nothing else.
-
-Korean: {text}
-
-English:"""
-
-        def _translate_sync() -> str:
-            response = self.genai_client.models.generate_content(
-                model="gemini-3-flash-preview",
-                contents=prompt,
-            )
-            return response.text.strip() if response.text else text
-
-        return await asyncio.to_thread(_translate_sync)
-
     async def search(
         self,
         query: str,
@@ -125,18 +87,15 @@ English:"""
         Search for relevant IPC codes.
 
         Args:
-            query: Invention description or technical keywords (Korean auto-translated)
+            query: Invention description or technical keywords (Korean)
             top_k: Number of results to return
             level_filter: Optional filter - "subclass" or "main_group"
 
         Returns:
             List of IpcSearchResult sorted by relevance (highest first)
         """
-        # Translate Korean to English for better embedding alignment
-        query_en = await self._translate_to_english(query)
-
-        # Embed query
-        query_embedding = await self.embedding_service.embed(query_en)
+        # Embed query directly (Korean embeddings)
+        query_embedding = await self.embedding_service.embed(query)
         query_vec = np.array(query_embedding, dtype=np.float32)
 
         # Normalize query
@@ -173,7 +132,6 @@ English:"""
                 IpcSearchResult(
                     code=code,
                     description=ipc_info.get("description", ""),
-                    description_ko=ipc_info.get("description_ko"),
                     level=ipc_info.get("level", "unknown"),
                     score=score,
                 )
