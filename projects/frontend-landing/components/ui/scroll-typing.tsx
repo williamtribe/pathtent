@@ -28,7 +28,7 @@ const ScrollTyping = ({
     const trigger = ScrollTrigger.create({
       trigger: containerRef.current,
       start: "top top",
-      end: `+=${totalChars * 15}`, // One char at a time, responsive
+      end: `+=${totalChars * 23}`, // 2/3 speed (slower scroll)
       pin: true,
       scrub: true, // Direct 1:1 scroll-to-progress
       onUpdate: (self) => {
