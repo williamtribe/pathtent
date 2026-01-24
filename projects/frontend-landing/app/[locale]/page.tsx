@@ -15,8 +15,8 @@ export default function Home() {
       <main className="min-h-screen w-full overflow-x-hidden bg-white text-text">
         {/* Hero Section - Full viewport */}
         <section className="relative flex min-h-screen flex-col items-center justify-center px-6">
-          {/* Threads Background */}
-          <div className="pointer-events-none absolute inset-0 -translate-y-[12.5%] opacity-30">
+          {/* Threads Background - aligned with Pathtent text */}
+          <div className="pointer-events-none absolute inset-0 -translate-y-[20%] opacity-30">
             <Threads color={[0.18, 0.34, 0.99]} amplitude={2} distance={0.3} />
           </div>
 
@@ -67,14 +67,11 @@ export default function Home() {
           </motion.div>
         </section>
 
-        {/* Tagline Section - Scroll-linked Typing Animation */}
-        <section className="flex min-h-screen flex-col items-center justify-center px-6">
-          <ScrollTyping
-            text="Revolutionizing Revolutions."
-            className="text-5xl font-bold tracking-tight text-text md:text-7xl lg:text-8xl"
-            cursorClassName="text-primary"
-          />
-        </section>
+        {/* Tagline Section - Scroll-hijacked Typing Animation */}
+        <ScrollTyping
+          text="Revolutionizing Revolutions."
+          className="text-5xl font-bold tracking-tight text-text md:text-7xl lg:text-8xl"
+        />
 
         {/* Problem Statement */}
         <section className="flex min-h-[70vh] flex-col items-center justify-center px-6 py-24">

@@ -296,23 +296,23 @@ const TargetCursor: React.FC<TargetCursorProps> = ({
     >
       <div
         ref={dotRef}
-        className="absolute left-1/2 top-1/2 h-1 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white"
+        className="absolute left-1/2 top-1/2 h-1 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-black"
         style={{ willChange: "transform" }}
       />
       <div
-        className="target-cursor-corner absolute left-1/2 top-1/2 h-3 w-3 -translate-x-[150%] -translate-y-[150%] border-[3px] border-b-0 border-r-0 border-white"
+        className="target-cursor-corner absolute left-1/2 top-1/2 h-3 w-3 -translate-x-[150%] -translate-y-[150%] border-[3px] border-b-0 border-r-0 border-black"
         style={{ willChange: "transform" }}
       />
       <div
-        className="target-cursor-corner absolute left-1/2 top-1/2 h-3 w-3 -translate-y-[150%] translate-x-1/2 border-[3px] border-b-0 border-l-0 border-white"
+        className="target-cursor-corner absolute left-1/2 top-1/2 h-3 w-3 -translate-y-[150%] translate-x-1/2 border-[3px] border-b-0 border-l-0 border-black"
         style={{ willChange: "transform" }}
       />
       <div
-        className="target-cursor-corner absolute left-1/2 top-1/2 h-3 w-3 translate-x-1/2 translate-y-1/2 border-[3px] border-l-0 border-t-0 border-white"
+        className="target-cursor-corner absolute left-1/2 top-1/2 h-3 w-3 translate-x-1/2 translate-y-1/2 border-[3px] border-l-0 border-t-0 border-black"
         style={{ willChange: "transform" }}
       />
       <div
-        className="target-cursor-corner absolute left-1/2 top-1/2 h-3 w-3 -translate-x-[150%] translate-y-1/2 border-[3px] border-r-0 border-t-0 border-white"
+        className="target-cursor-corner absolute left-1/2 top-1/2 h-3 w-3 -translate-x-[150%] translate-y-1/2 border-[3px] border-r-0 border-t-0 border-black"
         style={{ willChange: "transform" }}
       />
     </div>

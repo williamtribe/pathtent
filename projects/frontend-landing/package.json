@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@fontsource-variable/mona-sans": "^5.2.8",
+    "@gsap/react": "^2.1.2",
     "@radix-ui/themes": "3.2.1",
     "@serwist/next": "^9.2.1",
     "cytoscape": "^3.33.1",
