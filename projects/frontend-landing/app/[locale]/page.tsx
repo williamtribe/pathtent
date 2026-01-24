@@ -1,24 +1,51 @@
 "use client"
 
+import dynamic from "next/dynamic"
 import { motion } from "motion/react"
 import { Link } from "@/i18n/routing"
 import { ArrowRight } from "lucide-react"
-import Threads from "@/components/ui/threads"
-import TargetCursor from "@/components/ui/target-cursor"
-import ScrollTyping from "@/components/ui/scroll-typing"
-import FadeContent from "@/components/ui/fade-content"
+import { useFadeIn } from "@/hooks/use-fade-in"
 
-// Vertical line segment component
-const VerticalLine = ({ className = "" }: { className?: string }) => (
-  <div className={`mx-auto h-32 w-0.5 bg-black ${className}`} />
-)
+// Client-only components (avoid hydration mismatch)
+const Threads = dynamic(() => import("@/components/ui/threads"), { ssr: false })
+const ScrollTyping = dynamic(() => import("@/components/ui/scroll-typing"), { ssr: false })
+
+// Shared gradient styles
+const gradientProblem = "bg-gradient-to-r from-rose-500 to-orange-500 bg-clip-text text-transparent"
+const gradientSolution = "bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent"
+
+// Simple fade-in component using CSS
+function FadeIn({
+  children,
+  className = "",
+  delay = 0,
+}: {
+  children: React.ReactNode
+  className?: string
+  delay?: number
+}) {
+  const { ref, isVisible } = useFadeIn(0.2)
+
+  return (
+    <div
+      ref={ref}
+      className={className}
+      style={{
+        opacity: isVisible ? 1 : 0,
+        transform: isVisible ? "translateY(0)" : "translateY(30px)",
+        transition: `opacity 0.7s ease-out ${delay}s, transform 0.7s ease-out ${delay}s`,
+      }}
+    >
+      {children}
+    </div>
+  )
+}
 
 export default function Home() {
   return (
     <>
-      <TargetCursor targetSelector=".cursor-target" />
 
-      <main className="relative min-h-screen w-full overflow-x-hidden bg-gradient-to-b from-white to-sky-200 text-text">
+      <main className="relative min-h-screen w-full overflow-x-hidden bg-gradient-to-b from-white to-amber-50 text-text">
         {/* Hero Section - Full viewport */}
         <section className="relative flex min-h-screen flex-col items-center justify-center px-6">
           {/* Threads Background - aligned with Pathtent text */}
@@ -45,7 +72,7 @@ export default function Home() {
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                className="cursor-target inline-flex items-center gap-3 rounded-full bg-primary px-8 py-4 text-lg font-semibold text-white transition-all hover:bg-primary-hover"
+                className="inline-flex items-center gap-3 rounded-full bg-primary px-8 py-4 text-lg font-semibold text-white transition-all hover:bg-primary-hover"
               >
                 Start Creating <ArrowRight className="h-5 w-5" />
               </motion.button>
@@ -73,58 +100,48 @@ export default function Home() {
           </motion.div>
         </section>
 
-        {/* Line: Hero → Typing */}
-        <VerticalLine />
-
         {/* Tagline Section - Scroll-hijacked Typing Animation */}
         <ScrollTyping
           text="Revolutionizing Revolutions."
           className="text-5xl font-bold tracking-tight text-text md:text-7xl lg:text-8xl"
         />
 
-        {/* Line: Typing → Problem */}
-        <VerticalLine />
-
         {/* Problem Statement */}
         <section className="flex min-h-[70vh] flex-col items-center justify-center px-6 py-24">
-          <div className="max-w-4xl text-center">
-            <FadeContent className="mb-4 text-sm font-medium uppercase tracking-widest text-primary">
+          <FadeIn className="max-w-4xl text-center">
+            <p className="mb-4 text-sm font-medium uppercase tracking-widest text-primary">
               The Problem
-            </FadeContent>
-            <FadeContent className="text-3xl font-medium leading-relaxed text-text-muted md:text-4xl lg:text-5xl">
+            </p>
+            <p className="text-3xl font-medium leading-relaxed text-text-muted md:text-4xl lg:text-5xl">
               Patent drafting is{" "}
-              <span className="text-text">complex</span>,{" "}
-              <span className="text-text">expensive</span>, and{" "}
-              <span className="text-text">time-consuming</span>.
-            </FadeContent>
-          </div>
+              <span className={gradientProblem}>complex</span>,{" "}
+              <span className={gradientProblem}>expensive</span>, and{" "}
+              <span className={gradientProblem}>time-consuming</span>.
+            </p>
+          </FadeIn>
         </section>
-
-        {/* Line: Problem → Solution */}
-        <VerticalLine />
 
         {/* Solution Statement */}
         <section className="flex min-h-[70vh] flex-col items-center justify-center px-6 py-24">
           <div className="max-w-4xl text-center">
-            <FadeContent className="mb-8 text-sm font-medium uppercase tracking-widest text-primary">
-              The Solution
-            </FadeContent>
+            <FadeIn>
+              <p className="mb-8 text-sm font-medium uppercase tracking-widest text-primary">
+                The Solution
+              </p>
+            </FadeIn>
             <div className="space-y-6 text-3xl font-medium leading-relaxed md:text-4xl lg:text-5xl">
-              <FadeContent className="text-text-muted">
-                <span className="text-text">AI</span> that understands patents.
-              </FadeContent>
-              <FadeContent className="text-text-muted">
-                <span className="text-text">Automation</span> that saves weeks.
-              </FadeContent>
-              <FadeContent className="text-text-muted">
-                <span className="text-text">Quality</span> you can trust.
-              </FadeContent>
+              <FadeIn className="text-text-muted" delay={0}>
+                <span className={gradientSolution}>AI</span> that understands patents.
+              </FadeIn>
+              <FadeIn className="text-text-muted" delay={0.15}>
+                <span className={gradientSolution}>Automation</span> that saves weeks.
+              </FadeIn>
+              <FadeIn className="text-text-muted" delay={0.3}>
+                <span className={gradientSolution}>Quality</span> you can trust.
+              </FadeIn>
             </div>
           </div>
         </section>
-
-        {/* Line: Solution → CTA */}
-        <VerticalLine />
 
         {/* CTA Section */}
         <section className="flex min-h-[60vh] flex-col items-center justify-center px-6 py-24">
@@ -141,7 +158,7 @@ export default function Home() {
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                className="cursor-target inline-flex items-center gap-3 rounded-full bg-primary px-10 py-5 text-xl font-semibold text-white transition-all hover:bg-primary-hover"
+                className="inline-flex items-center gap-3 rounded-full bg-primary px-10 py-5 text-xl font-semibold text-white transition-all hover:bg-primary-hover"
               >
                 Get Started <ArrowRight className="h-6 w-6" />
               </motion.button>

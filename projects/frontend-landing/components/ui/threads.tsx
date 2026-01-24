@@ -135,6 +135,7 @@ const Threads: React.FC<ThreadsProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const animationFrameId = useRef<number>(0)
+  const isVisibleRef = useRef<boolean>(true)
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -193,6 +194,12 @@ const Threads: React.FC<ThreadsProps> = ({
     }
 
     function update(t: number) {
+      // Skip rendering when off-screen
+      if (!isVisibleRef.current) {
+        animationFrameId.current = requestAnimationFrame(update)
+        return
+      }
+
       if (enableMouseInteraction) {
         const smoothing = 0.05
         currentMouse[0] += smoothing * (targetMouse[0] - currentMouse[0])
@@ -210,9 +217,19 @@ const Threads: React.FC<ThreadsProps> = ({
     }
     animationFrameId.current = requestAnimationFrame(update)
 
+    // Pause when off-screen
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        isVisibleRef.current = entry?.isIntersecting ?? false
+      },
+      { threshold: 0 }
+    )
+    observer.observe(container)
+
     return () => {
       if (animationFrameId.current) cancelAnimationFrame(animationFrameId.current)
       window.removeEventListener("resize", resize)
+      observer.disconnect()
 
       if (enableMouseInteraction) {
         container.removeEventListener("mousemove", handleMouseMove)

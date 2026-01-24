@@ -57,4 +57,14 @@
     scrollbar-width: thin;
     scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
   }
+
+  /* Cursor blink animation */
+  @keyframes cursor-blink {
+    0%, 45% { opacity: 1; }
+    50%, 100% { opacity: 0; }
+  }
+  
+  .animate-cursor-blink {
+    animation: cursor-blink 0.8s infinite;
+  }
 }

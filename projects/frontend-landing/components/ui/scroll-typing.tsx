@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useEffect, useState } from "react"
+import { useRef, useEffect } from "react"
 import { gsap } from "gsap"
 import { ScrollTrigger } from "gsap/ScrollTrigger"
 
@@ -15,10 +15,11 @@ interface ScrollTypingProps {
 const ScrollTyping = ({
   text,
   className = "",
-  activeColor = "rgb(46, 86, 252)", // primary color
+  activeColor = "rgb(46, 86, 252)",
 }: ScrollTypingProps) => {
   const containerRef = useRef<HTMLDivElement>(null)
-  const [visibleChars, setVisibleChars] = useState(0)
+  const charsRef = useRef<(HTMLSpanElement | null)[]>([])
+  const lastVisibleRef = useRef<number>(-1)
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -28,84 +29,71 @@ const ScrollTyping = ({
     const trigger = ScrollTrigger.create({
       trigger: containerRef.current,
       start: "top top",
-      end: `+=${totalChars * 80}`, // balanced speed
+      end: `+=${totalChars * 80}`,
       pin: true,
-      scrub: true, // Direct 1:1 scroll-to-progress
+      scrub: true,
       onUpdate: (self) => {
-        const progress = self.progress
-        const charIndex = Math.floor(progress * totalChars)
-        setVisibleChars(charIndex)
+        const charIndex = Math.floor(self.progress * totalChars)
+        
+        // Skip if no change
+        if (charIndex === lastVisibleRef.current) return
+        
+        const prevIndex = lastVisibleRef.current
+        lastVisibleRef.current = charIndex
+
+        // Update only changed characters (no React re-render)
+        charsRef.current.forEach((el, i) => {
+          if (!el) return
+          
+          const wasVisible = i < prevIndex
+          const isVisible = i < charIndex
+          const wasLast = i === prevIndex - 1
+          const isLast = i === charIndex - 1
+
+          // Only update if state changed
+          if (wasVisible !== isVisible) {
+            el.style.opacity = isVisible ? "1" : "0"
+          }
+          
+          // Update highlight color
+          if (wasLast && !isLast) {
+            el.style.color = "inherit"
+          }
+          if (isLast && !wasLast) {
+            el.style.color = activeColor
+          }
+        })
+
+
       },
     })
 
     return () => {
       trigger.kill()
     }
-  }, [text])
-
-  const isComplete = visibleChars >= text.length
+  }, [text, activeColor])
 
   return (
     <div
       ref={containerRef}
       className="flex min-h-screen items-center justify-center px-6"
     >
-      <div className="max-w-5xl text-center">
+      <div className="relative max-w-5xl text-center">
         <span className={className}>
-          {text.split("").map((char, index) => {
-            const isVisible = index < visibleChars
-            const isLastVisible = index === visibleChars - 1
-
-            return (
-              <span key={index} className="relative inline">
-                <span
-                  style={{
-                    opacity: isVisible ? 1 : 0,
-                    color: isLastVisible ? activeColor : "inherit",
-                    transition: "color 0.3s ease",
-                  }}
-                >
-                  {char}
-                </span>
-                {/* Cursor appears right after the last visible character */}
-                {isLastVisible && !isComplete && (
-                  <span
-                    className="text-primary"
-                    style={{
-                      animation: "blink 0.8s infinite",
-                    }}
-                  >
-                    _
-                  </span>
-                )}
-              </span>
-            )
-          })}
-          {/* Initial cursor when nothing typed yet */}
-          {visibleChars === 0 && (
+          {text.split("").map((char, index) => (
             <span
-              className="text-primary"
+              key={index}
+              ref={(el) => { charsRef.current[index] = el }}
               style={{
-                animation: "blink 0.8s infinite",
+                opacity: 0,
+                transition: "color 0.3s ease",
               }}
             >
-              _
+              {char}
             </span>
-          )}
+          ))}
         </span>
       </div>
-      <style jsx>{`
-        @keyframes blink {
-          0%,
-          45% {
-            opacity: 1;
-          }
-          50%,
-          100% {
-            opacity: 0;
-          }
-        }
-      `}</style>
     </div>
   )
 }
