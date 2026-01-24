@@ -55,16 +55,28 @@ export default function Home() {
             {t('hero.subtitle')}
           </motion.p>
 
-          <Link href="/generate">
-            <motion.button
-              variants={itemVariants}
-              whileHover={{ y: -2 }}
-              whileTap={{ scale: 0.98 }}
-              className="inline-flex items-center gap-2 rounded-lg bg-primary px-8 py-4 text-lg font-semibold text-white transition-all hover:bg-primary-hover"
-            >
-              {t('hero.cta')} <ArrowRight className="h-5 w-5" />
-            </motion.button>
-          </Link>
+          <motion.div variants={itemVariants} className="flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
+            <Link href="/generate">
+              <motion.button
+                whileHover={{ y: -2 }}
+                whileTap={{ scale: 0.98 }}
+                className="inline-flex items-center gap-2 rounded-lg bg-primary px-8 py-4 text-lg font-semibold text-white transition-all hover:bg-primary-hover"
+              >
+                <FileText className="h-5 w-5" />
+                명세서 생성
+              </motion.button>
+            </Link>
+            <Link href="/formula">
+              <motion.button
+                whileHover={{ y: -2 }}
+                whileTap={{ scale: 0.98 }}
+                className="inline-flex items-center gap-2 rounded-lg border-2 border-primary bg-white px-8 py-4 text-lg font-semibold text-primary transition-all hover:bg-secondary"
+              >
+                <Search className="h-5 w-5" />
+                검색식 생성
+              </motion.button>
+            </Link>
+          </motion.div>
         </motion.div>
       </section>
 
