@@ -376,6 +376,99 @@ export async function analyzeSNA(params: SNAParams): Promise<SNAResult> {
   return response.json()
 }
 
+// ============================================================================
+// Formula Types & API Functions
+// ============================================================================
+
+export interface FormulaOptions {
+  target_precision?: "high" | "balanced" | "recall"
+  include_synonyms?: boolean
+  include_ipc?: boolean
+}
+
+export interface FormulaResult {
+  formula: string
+  keywords: string[]
+  synonyms: Record<string, string[]>
+  ipc_codes: string[]
+  excluded_terms: string[]
+  explanation: string
+  tips: string[]
+}
+
+export interface FormulaGenerateRequest {
+  text: string
+  options?: FormulaOptions
+}
+
+export interface FormulaImproveRequest {
+  original_formula: string
+  original_keywords: string[]
+  original_synonyms: Record<string, string[]>
+  feedback: "too_many" | "too_few" | "noisy"
+  result_count?: number
+  additional_context?: string
+}
+
+/**
+ * Generate KIPRIS search formula from invention description
+ */
+export async function generateFormula(
+  text: string,
+  options?: FormulaOptions
+): Promise<FormulaResult> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/formula/generate`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ text, options }),
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: "Unknown error" }))
+    throw new Error(error.detail || `HTTP ${response.status}`)
+  }
+
+  return response.json()
+}
+
+/**
+ * Improve existing KIPRIS search formula based on feedback
+ */
+export async function improveFormula(
+  originalFormula: string,
+  originalKeywords: string[],
+  originalSynonyms: Record<string, string[]>,
+  feedback: "too_many" | "too_few" | "noisy",
+  resultCount?: number,
+  additionalContext?: string
+): Promise<FormulaResult> {
+  const request: FormulaImproveRequest = {
+    original_formula: originalFormula,
+    original_keywords: originalKeywords,
+    original_synonyms: originalSynonyms,
+    feedback,
+    result_count: resultCount,
+    additional_context: additionalContext,
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/v1/formula/improve`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(request),
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: "Unknown error" }))
+    throw new Error(error.detail || `HTTP ${response.status}`)
+  }
+
+  return response.json()
+}
+
 /**
  * Download patent specification as Word document
  */
