@@ -13,7 +13,7 @@ export default function Home() {
     <>
       <TargetCursor targetSelector=".cursor-target" />
 
-      <main className="min-h-screen w-full overflow-x-hidden bg-gradient-to-b from-white to-primary/70 text-text">
+      <main className="min-h-screen w-full overflow-x-hidden bg-gradient-to-b from-white to-black text-text">
         {/* Hero Section - Full viewport */}
         <section className="relative flex min-h-screen flex-col items-center justify-center px-6">
           {/* Threads Background - aligned with Pathtent text */}
@@ -76,43 +76,34 @@ export default function Home() {
 
         {/* Problem Statement */}
         <section className="flex min-h-[70vh] flex-col items-center justify-center px-6 py-24">
-          <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-100px" }}
-            transition={{ duration: 0.8 }}
-            className="max-w-4xl text-center"
-          >
-            <p className="mb-4 text-sm font-medium uppercase tracking-widest text-primary">
+          <div className="max-w-4xl text-center">
+            <FadeContent className="mb-4 text-sm font-medium uppercase tracking-widest text-primary">
               The Problem
-            </p>
-            <h3 className="text-3xl font-medium leading-relaxed text-text-muted md:text-4xl lg:text-5xl">
+            </FadeContent>
+            <FadeContent className="text-3xl font-medium leading-relaxed text-white/60 md:text-4xl lg:text-5xl">
               Patent drafting is{" "}
-              <span className="text-text">complex</span>,{" "}
-              <span className="text-text">expensive</span>, and{" "}
-              <span className="text-text">time-consuming</span>.
-            </h3>
-          </motion.div>
+              <span className="text-white">complex</span>,{" "}
+              <span className="text-white">expensive</span>, and{" "}
+              <span className="text-white">time-consuming</span>.
+            </FadeContent>
+          </div>
         </section>
 
         {/* Solution Statement */}
         <section className="flex min-h-[70vh] flex-col items-center justify-center px-6 py-24">
           <div className="max-w-4xl text-center">
-            <FadeContent
-              className="mb-8 text-sm font-medium uppercase tracking-widest text-primary"
-              duration={0.6}
-            >
+            <FadeContent className="mb-8 text-sm font-medium uppercase tracking-widest text-primary">
               The Solution
             </FadeContent>
             <div className="space-y-6 text-3xl font-medium leading-relaxed md:text-4xl lg:text-5xl">
-              <FadeContent className="text-text-muted" duration={0.8} delay={0.1}>
-                <span className="text-text">AI</span> that understands patents.
+              <FadeContent className="text-white/60">
+                <span className="text-white">AI</span> that understands patents.
               </FadeContent>
-              <FadeContent className="text-text-muted" duration={0.8} delay={0.2}>
-                <span className="text-text">Automation</span> that saves weeks.
+              <FadeContent className="text-white/60">
+                <span className="text-white">Automation</span> that saves weeks.
               </FadeContent>
-              <FadeContent className="text-text-muted" duration={0.8} delay={0.3}>
-                <span className="text-text">Quality</span> you can trust.
+              <FadeContent className="text-white/60">
+                <span className="text-white">Quality</span> you can trust.
               </FadeContent>
             </div>
           </div>

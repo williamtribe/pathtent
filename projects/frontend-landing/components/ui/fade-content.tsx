@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { useRef, useEffect } from "react"
+import { useRef, useEffect, useState } from "react"
 import { gsap } from "gsap"
 import { ScrollTrigger } from "gsap/ScrollTrigger"
 
@@ -10,67 +10,56 @@ gsap.registerPlugin(ScrollTrigger)
 interface FadeContentProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode
   blur?: boolean
-  duration?: number
-  ease?: string
-  delay?: number
-  threshold?: number
-  initialOpacity?: number
+  offset?: string // e.g., "top center" or "top 80%"
 }
 
 const FadeContent: React.FC<FadeContentProps> = ({
   children,
   blur = false,
-  duration = 1,
-  ease = "power2.out",
-  delay = 0,
-  threshold = 0.1,
-  initialOpacity = 0,
+  offset = "top 80%",
   className = "",
   ...props
 }) => {
   const ref = useRef<HTMLDivElement>(null)
+  const [opacity, setOpacity] = useState(0)
+  const [blurValue, setBlurValue] = useState(blur ? 10 : 0)
+  const [yOffset, setYOffset] = useState(30)
 
   useEffect(() => {
     const el = ref.current
     if (!el) return
 
-    const startPct = (1 - threshold) * 100
-
-    gsap.set(el, {
-      autoAlpha: initialOpacity,
-      filter: blur ? "blur(10px)" : "blur(0px)",
-      y: 20,
-    })
-
-    const tl = gsap.timeline({
-      paused: true,
-      delay: delay,
-    })
-
-    tl.to(el, {
-      autoAlpha: 1,
-      filter: "blur(0px)",
-      y: 0,
-      duration: duration,
-      ease: ease,
-    })
-
-    const st = ScrollTrigger.create({
+    const trigger = ScrollTrigger.create({
       trigger: el,
-      start: `top ${startPct}%`,
-      once: true,
-      onEnter: () => tl.play(),
+      start: offset,
+      end: "top 30%",
+      scrub: 0.5,
+      onUpdate: (self) => {
+        const progress = self.progress
+        setOpacity(progress)
+        setYOffset(30 * (1 - progress))
+        if (blur) {
+          setBlurValue(10 * (1 - progress))
+        }
+      },
     })
 
     return () => {
-      st.kill()
-      tl.kill()
-      gsap.killTweensOf(el)
+      trigger.kill()
     }
-  }, [blur, duration, ease, delay, threshold, initialOpacity])
+  }, [blur, offset])
 
   return (
-    <div ref={ref} className={className} {...props}>
+    <div
+      ref={ref}
+      className={className}
+      style={{
+        opacity,
+        transform: `translateY(${yOffset}px)`,
+        filter: blur ? `blur(${blurValue}px)` : undefined,
+      }}
+      {...props}
+    >
       {children}
     </div>
   )

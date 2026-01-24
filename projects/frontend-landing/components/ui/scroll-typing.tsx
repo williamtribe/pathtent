@@ -28,7 +28,7 @@ const ScrollTyping = ({
     const trigger = ScrollTrigger.create({
       trigger: containerRef.current,
       start: "top top",
-      end: `+=${totalChars * 18}`, // Keep current speed
+      end: `+=${totalChars * 24}`, // 30% slower
       pin: true, // Scroll intercept restored
       scrub: 0.1,
       onUpdate: (self) => {
