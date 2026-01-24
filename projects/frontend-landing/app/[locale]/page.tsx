@@ -13,7 +13,7 @@ export default function Home() {
     <>
       <TargetCursor targetSelector=".cursor-target" />
 
-      <main className="min-h-screen w-full overflow-x-hidden bg-gradient-to-b from-white to-black text-text">
+      <main className="min-h-screen w-full overflow-x-hidden bg-gradient-to-b from-white to-neutral-800 text-text">
         {/* Hero Section - Full viewport */}
         <section className="relative flex min-h-screen flex-col items-center justify-center px-6">
           {/* Threads Background - aligned with Pathtent text */}
