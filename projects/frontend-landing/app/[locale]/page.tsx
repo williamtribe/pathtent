@@ -13,7 +13,9 @@ export default function Home() {
     <>
       <TargetCursor targetSelector=".cursor-target" />
 
-      <main className="min-h-screen w-full overflow-x-hidden bg-gradient-to-b from-white to-sky-400 text-text">
+      <main className="relative min-h-screen w-full overflow-x-hidden bg-gradient-to-b from-white to-sky-100 text-text">
+        {/* Vertical center line */}
+        <div className="pointer-events-none fixed left-1/2 top-0 h-full w-px -translate-x-1/2 bg-black/20" />
         {/* Hero Section - Full viewport */}
         <section className="relative flex min-h-screen flex-col items-center justify-center px-6">
           {/* Threads Background - aligned with Pathtent text */}
@@ -80,11 +82,11 @@ export default function Home() {
             <FadeContent className="mb-4 text-sm font-medium uppercase tracking-widest text-primary">
               The Problem
             </FadeContent>
-            <FadeContent className="text-3xl font-medium leading-relaxed text-white/60 md:text-4xl lg:text-5xl">
+            <FadeContent className="text-3xl font-medium leading-relaxed text-text-muted md:text-4xl lg:text-5xl">
               Patent drafting is{" "}
-              <span className="text-white">complex</span>,{" "}
-              <span className="text-white">expensive</span>, and{" "}
-              <span className="text-white">time-consuming</span>.
+              <span className="text-text">complex</span>,{" "}
+              <span className="text-text">expensive</span>, and{" "}
+              <span className="text-text">time-consuming</span>.
             </FadeContent>
           </div>
         </section>
@@ -96,14 +98,14 @@ export default function Home() {
               The Solution
             </FadeContent>
             <div className="space-y-6 text-3xl font-medium leading-relaxed md:text-4xl lg:text-5xl">
-              <FadeContent className="text-white/60">
-                <span className="text-white">AI</span> that understands patents.
+              <FadeContent className="text-text-muted">
+                <span className="text-text">AI</span> that understands patents.
               </FadeContent>
-              <FadeContent className="text-white/60">
-                <span className="text-white">Automation</span> that saves weeks.
+              <FadeContent className="text-text-muted">
+                <span className="text-text">Automation</span> that saves weeks.
               </FadeContent>
-              <FadeContent className="text-white/60">
-                <span className="text-white">Quality</span> you can trust.
+              <FadeContent className="text-text-muted">
+                <span className="text-text">Quality</span> you can trust.
               </FadeContent>
             </div>
           </div>
@@ -118,7 +120,7 @@ export default function Home() {
             transition={{ duration: 0.6 }}
             className="text-center"
           >
-            <h2 className="mb-8 text-4xl font-bold text-white md:text-6xl">Ready to innovate?</h2>
+            <h2 className="mb-8 text-4xl font-bold text-text md:text-6xl">Ready to innovate?</h2>
 
             <Link href="/generate">
               <motion.button
