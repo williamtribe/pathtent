@@ -10,53 +10,48 @@ gsap.registerPlugin(ScrollTrigger)
 interface FadeContentProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode
   blur?: boolean
-  offset?: string // e.g., "top center" or "top 80%"
+  duration?: number
+  threshold?: number
 }
 
 const FadeContent: React.FC<FadeContentProps> = ({
   children,
   blur = false,
-  offset = "top 80%",
+  duration = 0.4, // Fast fade
+  threshold = 0.2,
   className = "",
   ...props
 }) => {
   const ref = useRef<HTMLDivElement>(null)
-  const [opacity, setOpacity] = useState(0)
-  const [blurValue, setBlurValue] = useState(blur ? 10 : 0)
-  const [yOffset, setYOffset] = useState(30)
+  const [isVisible, setIsVisible] = useState(false)
 
   useEffect(() => {
     const el = ref.current
     if (!el) return
 
+    const startPct = (1 - threshold) * 100
+
     const trigger = ScrollTrigger.create({
       trigger: el,
-      start: offset,
-      end: "top 30%",
-      scrub: 0.5,
-      onUpdate: (self) => {
-        const progress = self.progress
-        setOpacity(progress)
-        setYOffset(30 * (1 - progress))
-        if (blur) {
-          setBlurValue(10 * (1 - progress))
-        }
-      },
+      start: `top ${startPct}%`,
+      once: true,
+      onEnter: () => setIsVisible(true),
     })
 
     return () => {
       trigger.kill()
     }
-  }, [blur, offset])
+  }, [threshold])
 
   return (
     <div
       ref={ref}
       className={className}
       style={{
-        opacity,
-        transform: `translateY(${yOffset}px)`,
-        filter: blur ? `blur(${blurValue}px)` : undefined,
+        opacity: isVisible ? 1 : 0,
+        transform: isVisible ? "translateY(0)" : "translateY(20px)",
+        filter: blur ? (isVisible ? "blur(0px)" : "blur(10px)") : undefined,
+        transition: `opacity ${duration}s ease-out, transform ${duration}s ease-out, filter ${duration}s ease-out`,
       }}
       {...props}
     >
