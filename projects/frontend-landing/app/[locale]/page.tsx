@@ -12,7 +12,7 @@ export default function Home() {
     <>
       <TargetCursor targetSelector=".cursor-target" />
 
-      <main className="min-h-screen w-full overflow-x-hidden bg-gradient-to-b from-white to-primary/30 text-text">
+      <main className="min-h-screen w-full overflow-x-hidden bg-gradient-to-b from-white to-primary/70 text-text">
         {/* Hero Section - Full viewport */}
         <section className="relative flex min-h-screen flex-col items-center justify-center px-6">
           {/* Threads Background - aligned with Pathtent text */}
@@ -96,24 +96,46 @@ export default function Home() {
 
         {/* Solution Statement */}
         <section className="flex min-h-[70vh] flex-col items-center justify-center px-6 py-24">
-          <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-100px" }}
-            transition={{ duration: 0.8 }}
-            className="max-w-4xl text-center"
-          >
-            <p className="mb-4 text-sm font-medium uppercase tracking-widest text-primary">
+          <div className="max-w-4xl text-center">
+            <motion.p
+              initial={{ opacity: 0 }}
+              whileInView={{ opacity: 1 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+              className="mb-8 text-sm font-medium uppercase tracking-widest text-primary"
+            >
               The Solution
-            </p>
-            <h3 className="text-3xl font-medium leading-relaxed text-text-muted md:text-4xl lg:text-5xl">
-              <span className="text-text">AI</span> that understands patents.
-              <br />
-              <span className="text-text">Automation</span> that saves weeks.
-              <br />
-              <span className="text-text">Quality</span> you can trust.
-            </h3>
-          </motion.div>
+            </motion.p>
+            <div className="space-y-4 text-3xl font-medium leading-relaxed md:text-4xl lg:text-5xl">
+              <motion.p
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: 0.1 }}
+                className="text-text-muted"
+              >
+                <span className="text-text">AI</span> that understands patents.
+              </motion.p>
+              <motion.p
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: 0.3 }}
+                className="text-text-muted"
+              >
+                <span className="text-text">Automation</span> that saves weeks.
+              </motion.p>
+              <motion.p
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: 0.5 }}
+                className="text-text-muted"
+              >
+                <span className="text-text">Quality</span> you can trust.
+              </motion.p>
+            </div>
+          </div>
         </section>
 
         {/* CTA Section */}

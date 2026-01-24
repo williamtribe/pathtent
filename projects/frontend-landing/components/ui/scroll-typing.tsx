@@ -18,21 +18,20 @@ const ScrollTyping = ({
   activeColor = "rgb(46, 86, 252)", // primary color
 }: ScrollTypingProps) => {
   const containerRef = useRef<HTMLDivElement>(null)
-  const textRef = useRef<HTMLDivElement>(null)
   const [visibleChars, setVisibleChars] = useState(0)
   const [activeCharIndex, setActiveCharIndex] = useState(-1)
 
   useEffect(() => {
-    if (!containerRef.current || !textRef.current) return
+    if (!containerRef.current) return
 
     const totalChars = text.length
 
+    // No pin - just scrub typing with scroll, fast
     const trigger = ScrollTrigger.create({
       trigger: containerRef.current,
-      start: "top top",
-      end: `+=${totalChars * 18}`, // 18px per character = even faster
-      pin: true,
-      scrub: 0.2,
+      start: "top center",
+      end: "bottom center",
+      scrub: 0.1,
       onUpdate: (self) => {
         const progress = self.progress
         const charIndex = Math.floor(progress * totalChars)
@@ -51,9 +50,9 @@ const ScrollTyping = ({
   return (
     <div
       ref={containerRef}
-      className="flex min-h-screen items-center justify-center px-6"
+      className="flex min-h-[70vh] items-center justify-center px-6"
     >
-      <div ref={textRef} className="max-w-5xl text-center">
+      <div className="max-w-5xl text-center">
         <span className={className}>
           {text.split("").map((char, index) => {
             const isVisible = index < visibleChars
