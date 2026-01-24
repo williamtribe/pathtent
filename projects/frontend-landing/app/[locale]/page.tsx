@@ -6,6 +6,7 @@ import { ArrowRight } from "lucide-react"
 import Threads from "@/components/ui/threads"
 import TargetCursor from "@/components/ui/target-cursor"
 import ScrollTyping from "@/components/ui/scroll-typing"
+import FadeContent from "@/components/ui/fade-content"
 
 export default function Home() {
   return (
@@ -97,43 +98,22 @@ export default function Home() {
         {/* Solution Statement */}
         <section className="flex min-h-[70vh] flex-col items-center justify-center px-6 py-24">
           <div className="max-w-4xl text-center">
-            <motion.p
-              initial={{ opacity: 0 }}
-              whileInView={{ opacity: 1 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6 }}
+            <FadeContent
               className="mb-8 text-sm font-medium uppercase tracking-widest text-primary"
+              duration={0.6}
             >
               The Solution
-            </motion.p>
-            <div className="space-y-4 text-3xl font-medium leading-relaxed md:text-4xl lg:text-5xl">
-              <motion.p
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: 0.1 }}
-                className="text-text-muted"
-              >
+            </FadeContent>
+            <div className="space-y-6 text-3xl font-medium leading-relaxed md:text-4xl lg:text-5xl">
+              <FadeContent className="text-text-muted" duration={0.8} delay={0.1}>
                 <span className="text-text">AI</span> that understands patents.
-              </motion.p>
-              <motion.p
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: 0.3 }}
-                className="text-text-muted"
-              >
+              </FadeContent>
+              <FadeContent className="text-text-muted" duration={0.8} delay={0.2}>
                 <span className="text-text">Automation</span> that saves weeks.
-              </motion.p>
-              <motion.p
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: 0.5 }}
-                className="text-text-muted"
-              >
+              </FadeContent>
+              <FadeContent className="text-text-muted" duration={0.8} delay={0.3}>
                 <span className="text-text">Quality</span> you can trust.
-              </motion.p>
+              </FadeContent>
             </div>
           </div>
         </section>
