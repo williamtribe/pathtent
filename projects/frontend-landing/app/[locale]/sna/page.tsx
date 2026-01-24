@@ -53,6 +53,8 @@ export default function SNAPage() {
   const [keyword, setKeyword] = useState('')
   const [codeLength, setCodeLength] = useState<4 | 8>(4)
   const [pageSize, setPageSize] = useState(500)
+  const [enableFilter, setEnableFilter] = useState(false)
+  const [minSimilarity, setMinSimilarity] = useState(0.5)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<SNAResult | null>(null)
@@ -76,14 +78,16 @@ export default function SNAPage() {
     setSelectedYear(null)
     setIsPlaying(false)
 
-    try {
-      const data = await analyzeSNA({
-        word: keyword,
-        codeLength,
-        pageSize,
-        includeYearly: true,
-      })
-      setResult(data)
+      try {
+        const data = await analyzeSNA({
+          word: keyword,
+          codeLength,
+          pageSize,
+          includeYearly: true,
+          enableFilter,
+          minSimilarity,
+        })
+        setResult(data)
       if (data.year_range) {
         setSelectedYear(data.year_range[1])
       }
@@ -256,7 +260,44 @@ export default function SNAPage() {
                 className="w-full rounded-lg border border-border p-3 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
               />
             </div>
+          </div>
 
+          <div className="mt-4 flex flex-wrap items-center gap-6 rounded-lg border border-border bg-surface/50 p-4">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={enableFilter}
+                onChange={(e) => setEnableFilter(e.target.checked)}
+                className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+              />
+              <span className="text-sm font-medium">AI 유사도 필터링</span>
+            </label>
+
+            {enableFilter && (
+              <div className="flex items-center gap-4 animate-in fade-in slide-in-from-left-4">
+                <div className="flex flex-col gap-1 w-48">
+                  <div className="flex justify-between text-xs text-text-muted">
+                    <span>최소 유사도</span>
+                    <span>{minSimilarity}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.3"
+                    max="0.9"
+                    step="0.05"
+                    value={minSimilarity}
+                    onChange={(e) => setMinSimilarity(Number(e.target.value))}
+                    className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-border accent-primary"
+                  />
+                </div>
+                <div className="text-xs text-text-muted">
+                  검색어와 연관성이 높은 특허만 분석합니다
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-6 flex justify-end">
             <button
               onClick={handleSearch}
               disabled={isLoading}
