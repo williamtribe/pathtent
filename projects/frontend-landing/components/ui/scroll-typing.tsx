@@ -30,9 +30,9 @@ const ScrollTyping = ({
     const trigger = ScrollTrigger.create({
       trigger: containerRef.current,
       start: "top top",
-      end: `+=${totalChars * 100}`, // 100px per character = slow scroll
+      end: `+=${totalChars * 30}`, // 30px per character = faster scroll
       pin: true,
-      scrub: 0.5,
+      scrub: 0.3,
       onUpdate: (self) => {
         const progress = self.progress
         const charIndex = Math.floor(progress * totalChars)
@@ -50,36 +50,55 @@ const ScrollTyping = ({
     <div ref={containerRef} className="flex min-h-screen items-center justify-center px-6">
       <div ref={textRef} className="max-w-5xl text-center">
         <span className={className}>
-          {text.split("").map((char, index) => (
+          {text.split("").map((char, index) => {
+            const isVisible = index < visibleChars
+            const isActive = index === activeCharIndex
+            const showCursor = index === visibleChars - 1 && visibleChars < text.length
+
+            return (
+              <span key={index} className="relative">
+                <span
+                  style={{
+                    opacity: isVisible ? 1 : 0,
+                    color: isActive ? activeColor : "inherit",
+                    transition: "color 0.3s ease",
+                  }}
+                >
+                  {char}
+                </span>
+                {showCursor && (
+                  <span
+                    className="absolute -right-1 text-primary"
+                    style={{
+                      animation: "blink 0.8s infinite",
+                    }}
+                  >
+                    _
+                  </span>
+                )}
+              </span>
+            )
+          })}
+          {/* Initial cursor when no chars typed */}
+          {visibleChars === 0 && (
             <span
-              key={index}
+              className="text-primary"
               style={{
-                opacity: index < visibleChars ? 1 : 0,
-                color: index === activeCharIndex ? activeColor : "inherit",
-                transition: "color 0.3s ease",
+                animation: "blink 0.8s infinite",
               }}
             >
-              {char}
+              _
             </span>
-          ))}
-          <span
-            className="ml-1 inline-block text-primary"
-            style={{
-              opacity: visibleChars < text.length ? 1 : 0,
-              animation: "blink 1s infinite",
-            }}
-          >
-            _
-          </span>
+          )}
         </span>
       </div>
       <style jsx>{`
         @keyframes blink {
           0%,
-          50% {
+          45% {
             opacity: 1;
           }
-          51%,
+          50%,
           100% {
             opacity: 0;
           }
