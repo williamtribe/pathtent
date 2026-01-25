@@ -306,6 +306,87 @@ export async function getSessionStatus(sessionId: string): Promise<SessionStatus
 }
 
 // ============================================================================
+// Formula Types
+// ============================================================================
+
+export interface FormulaOptions {
+  include_ipc?: boolean
+  include_synonyms?: boolean
+  target_precision?: 'high' | 'balanced' | 'recall'
+}
+
+export interface FormulaResult {
+  formula: string
+  keywords: string[]
+  synonyms: Record<string, string[]>
+  ipc_codes: string[]
+  excluded_terms: string[]
+  explanation: string
+  tips: string[]
+}
+
+// ============================================================================
+// Formula API
+// ============================================================================
+
+/**
+ * Generate a KIPRIS search formula from invention description
+ */
+export async function generateFormula(
+  text: string,
+  options?: FormulaOptions,
+): Promise<FormulaResult> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/formula/generate`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ text, options }),
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Unknown error' }))
+    throw new Error(error.detail || `HTTP ${response.status}`)
+  }
+
+  return response.json()
+}
+
+/**
+ * Improve an existing KIPRIS search formula based on feedback
+ */
+export async function improveFormula(
+  originalFormula: string,
+  originalKeywords: string[],
+  originalSynonyms: Record<string, string[]>,
+  originalExcludedTerms: string[],
+  feedback: 'too_many' | 'too_few' | 'noisy',
+  additionalContext?: string,
+): Promise<FormulaResult> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/formula/improve`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      original_formula: originalFormula,
+      original_keywords: originalKeywords,
+      original_synonyms: originalSynonyms,
+      original_excluded_terms: originalExcludedTerms,
+      feedback,
+      additional_context: additionalContext,
+    }),
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Unknown error' }))
+    throw new Error(error.detail || `HTTP ${response.status}`)
+  }
+
+  return response.json()
+}
+
+// ============================================================================
 // SNA Types
 // ============================================================================
 
@@ -345,8 +426,6 @@ export interface SNAParams {
   startYear?: number
   endYear?: number
   includeYearly?: boolean
-  enableFilter?: boolean
-  minSimilarity?: number
 }
 
 // ============================================================================
@@ -367,103 +446,8 @@ export async function analyzeSNA(params: SNAParams): Promise<SNAResult> {
   if (params.endYear) {
     searchParams.set('end_year', params.endYear.toString())
   }
-  if (params.enableFilter) {
-    searchParams.set('enable_filter', 'true')
-    if (params.minSimilarity) {
-      searchParams.set('min_similarity', params.minSimilarity.toString())
-    }
-  }
 
   const response = await fetch(`${API_BASE_URL}/api/v1/patent/sna/free?${searchParams}`)
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: 'Unknown error' }))
-    throw new Error(error.detail || `HTTP ${response.status}`)
-  }
-
-  return response.json()
-}
-
-// ============================================================================
-// Formula Generator Types
-// ============================================================================
-
-export interface IpcCode {
-  code: string
-  description: string
-  level: string
-  score: number
-}
-
-export interface FormulaResult {
-  formula: string
-  keywords: string[]
-  synonyms: Record<string, string[]>
-  excluded_terms: string[]
-  ipc_codes: IpcCode[]
-  explanation: string
-  tips: string[]
-}
-
-export interface ImproveFormulaParams {
-  original_formula: string
-  original_keywords: string[]
-  original_synonyms: Record<string, string[]>
-  original_excluded_terms: string[]
-  feedback: 'too_many' | 'too_few' | 'noisy'
-  result_count?: number
-  additional_context?: string
-}
-
-// ============================================================================
-// Formula Generator API
-// ============================================================================
-
-/**
- * Generate patent search formula from invention description
- */
-export async function generateFormula(text: string): Promise<FormulaResult> {
-  const response = await fetch(`${API_BASE_URL}/api/v1/patent/formula/generate`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ text }),
-  })
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: 'Unknown error' }))
-    throw new Error(error.detail || `HTTP ${response.status}`)
-  }
-
-  return response.json()
-}
-
-/**
- * Improve existing formula based on feedback
- */
-export async function improveFormula(
-  originalFormula: string,
-  originalKeywords: string[],
-  originalSynonyms: Record<string, string[]>,
-  originalExcludedTerms: string[],
-  feedback: 'too_many' | 'too_few' | 'noisy',
-  additionalContext?: string,
-): Promise<FormulaResult> {
-  const response = await fetch(`${API_BASE_URL}/api/v1/patent/formula/improve`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      original_formula: originalFormula,
-      original_keywords: originalKeywords,
-      original_synonyms: originalSynonyms,
-      original_excluded_terms: originalExcludedTerms,
-      feedback,
-      additional_context: additionalContext,
-    }),
-  })
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ detail: 'Unknown error' }))
