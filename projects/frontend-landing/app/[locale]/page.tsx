@@ -68,7 +68,7 @@ export default function Home() {
               AI-powered patent drafting. From idea to filing, simplified.
             </p>
 
-            <Link href="/generate">
+            <Link href="/dashboard">
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
@@ -154,7 +154,7 @@ export default function Home() {
           >
             <h2 className="mb-8 text-4xl font-bold text-text md:text-6xl">Ready to innovate?</h2>
 
-            <Link href="/generate">
+            <Link href="/dashboard">
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
