@@ -77,7 +77,7 @@ export function FormulaBlockComponent({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
-      className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800"
+      className="rounded-xl border border-border bg-white p-4 shadow-sm"
     >
       {/* Block Header */}
       <div className="mb-3 flex items-center justify-between">
@@ -89,13 +89,13 @@ export function FormulaBlockComponent({
               onChange={(e) => handleNameChange(e.target.value)}
               onBlur={() => setIsEditingName(false)}
               onKeyDown={(e) => e.key === "Enter" && setIsEditingName(false)}
-              className="rounded border border-gray-300 px-2 py-1 text-sm font-medium dark:border-gray-600 dark:bg-gray-700"
+              className="rounded border border-border bg-surface px-2 py-1 text-sm font-medium"
               autoFocus
             />
           ) : (
             <button
               onClick={() => setIsEditingName(true)}
-              className="text-sm font-medium text-gray-700 hover:text-indigo-600 dark:text-gray-300"
+              className="text-sm font-medium text-text hover:text-primary"
             >
               {block.name}
             </button>
@@ -105,7 +105,7 @@ export function FormulaBlockComponent({
         {canDelete && (
           <button
             onClick={onDelete}
-            className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20"
+            className="rounded p-1 text-text-muted hover:bg-red-50 hover:text-red-500"
             title="Delete block"
           >
             <Trash2 className="h-4 w-4" />
@@ -119,7 +119,7 @@ export function FormulaBlockComponent({
           <select
             value={block.field}
             onChange={(e) => handleFieldChange(e.target.value)}
-            className="appearance-none rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 pr-8 text-sm dark:border-gray-600 dark:bg-gray-700"
+            className="appearance-none rounded-lg border border-border bg-surface px-3 py-1.5 pr-8 text-sm"
           >
             {FIELD_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -127,14 +127,14 @@ export function FormulaBlockComponent({
               </option>
             ))}
           </select>
-          <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
         </div>
 
         <div className="relative">
           <select
             value={block.operator}
             onChange={(e) => handleOperatorChange(e.target.value)}
-            className="appearance-none rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 pr-8 text-sm dark:border-gray-600 dark:bg-gray-700"
+            className="appearance-none rounded-lg border border-border bg-surface px-3 py-1.5 pr-8 text-sm"
           >
             {OPERATOR_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -142,7 +142,7 @@ export function FormulaBlockComponent({
               </option>
             ))}
           </select>
-          <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
         </div>
       </div>
 
@@ -155,12 +155,12 @@ export function FormulaBlockComponent({
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.8, opacity: 0 }}
-            className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-3 py-1 text-sm text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300"
+            className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-3 py-1 text-sm text-primary"
           >
             {keyword}
             <button
               onClick={() => handleRemoveKeyword(keyword)}
-              className="ml-1 rounded-full p-0.5 hover:bg-indigo-200 dark:hover:bg-indigo-800"
+              className="ml-1 rounded-full p-0.5 hover:bg-primary/20"
             >
               <X className="h-3 w-3" />
             </button>
@@ -175,16 +175,16 @@ export function FormulaBlockComponent({
           value={newKeyword}
           onChange={(e) => setNewKeyword(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Add keyword..."
-          className="flex-1 rounded-lg border border-gray-200 px-3 py-1.5 text-sm placeholder:text-gray-400 dark:border-gray-600 dark:bg-gray-700"
+          placeholder="키워드 추가..."
+          className="flex-1 rounded-lg border border-border bg-white px-3 py-1.5 text-sm placeholder:text-text-muted"
         />
         <button
           onClick={handleAddKeyword}
           disabled={!newKeyword.trim()}
-          className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-1.5 text-sm text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-sm text-white hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Plus className="h-4 w-4" />
-          Add
+          추가
         </button>
       </div>
     </motion.div>

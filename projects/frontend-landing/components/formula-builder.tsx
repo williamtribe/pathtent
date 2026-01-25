@@ -128,7 +128,7 @@ export function FormulaBuilder({ initialData, onFormulaChange }: FormulaBuilderP
                 <select
                   value={blockOperators[index] || "AND"}
                   onChange={(e) => handleOperatorChange(index, e.target.value)}
-                  className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                  className="rounded-lg border border-border bg-white px-4 py-2 text-sm font-medium text-text shadow-sm hover:bg-surface"
                 >
                   {BLOCK_OPERATOR_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>
@@ -145,45 +145,45 @@ export function FormulaBuilder({ initialData, onFormulaChange }: FormulaBuilderP
       {/* Add Block Button */}
       <button
         onClick={handleAddBlock}
-        className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-300 py-4 text-gray-500 hover:border-indigo-400 hover:text-indigo-600 dark:border-gray-600 dark:hover:border-indigo-500"
+        className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border py-4 text-text-muted hover:border-primary hover:text-primary"
       >
         <Plus className="h-5 w-5" />
-        Add Block
+        블록 추가
       </button>
 
       {/* Assembled Formula Preview */}
-      <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/50">
+      <div className="rounded-xl border border-border bg-surface p-4">
         <div className="mb-2 flex items-center justify-between">
-          <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-            Assembled Formula
+          <h3 className="text-sm font-medium text-text">
+            조립된 검색식
           </h3>
           <div className="flex items-center gap-2">
             {isAssembling && (
-              <RefreshCw className="h-4 w-4 animate-spin text-gray-400" />
+              <RefreshCw className="h-4 w-4 animate-spin text-text-muted" />
             )}
             <button
               onClick={handleCopy}
               disabled={!assembledFormula}
-              className="inline-flex items-center gap-1 rounded-lg bg-gray-200 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-300 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+              className="inline-flex items-center gap-1 rounded-lg border border-border bg-white px-3 py-1.5 text-sm text-text hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
             >
               {copied ? (
                 <>
                   <Check className="h-4 w-4 text-green-500" />
-                  Copied!
+                  복사됨!
                 </>
               ) : (
                 <>
                   <Copy className="h-4 w-4" />
-                  Copy
+                  복사
                 </>
               )}
             </button>
           </div>
         </div>
-        <div className="min-h-[60px] rounded-lg bg-white p-3 font-mono text-sm text-gray-800 dark:bg-gray-900 dark:text-gray-200">
+        <div className="min-h-[60px] rounded-lg bg-white p-3 font-mono text-sm text-text">
           {assembledFormula || (
-            <span className="italic text-gray-400">
-              Add keywords to blocks to generate formula...
+            <span className="italic text-text-muted">
+              블록에 키워드를 추가하면 검색식이 생성됩니다...
             </span>
           )}
         </div>
@@ -194,14 +194,14 @@ export function FormulaBuilder({ initialData, onFormulaChange }: FormulaBuilderP
         <div className="space-y-2 text-sm">
           {ipcCodes.length > 0 && (
             <div>
-              <span className="font-medium text-gray-700 dark:text-gray-300">IPC Codes: </span>
-              <span className="text-gray-600 dark:text-gray-400">{ipcCodes.join(", ")}</span>
+              <span className="font-medium text-text">IPC 코드: </span>
+              <span className="text-text-muted">{ipcCodes.join(", ")}</span>
             </div>
           )}
           {excludedTerms.length > 0 && (
             <div>
-              <span className="font-medium text-gray-700 dark:text-gray-300">Excluded: </span>
-              <span className="text-gray-600 dark:text-gray-400">{excludedTerms.join(", ")}</span>
+              <span className="font-medium text-text">제외어: </span>
+              <span className="text-text-muted">{excludedTerms.join(", ")}</span>
             </div>
           )}
         </div>
