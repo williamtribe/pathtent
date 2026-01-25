@@ -1,4 +1,5 @@
 import asyncio
+import os
 from typing import Protocol
 
 import tiktoken
@@ -6,6 +7,9 @@ from google import genai
 
 EMBEDDING_MODEL_TOKEN_LIMIT = 2048
 TIKTOKEN_ENCODING = "cl100k_base"
+DEFAULT_EMBEDDING_MODEL = os.environ.get(
+    "GEMINI_EMBEDDING_MODEL", "gemini-embedding-001"
+)
 
 
 def truncate_to_token_limit(
@@ -36,18 +40,18 @@ class EmbeddingService(Protocol):
 
 
 class GeminiEmbeddingService:
-    """Gemini embedding service using embedding-001 model"""
+    """Gemini embedding service using gemini-embedding-001 model"""
 
-    def __init__(self, api_key: str, model: str = "models/embedding-001") -> None:
+    def __init__(self, api_key: str, model: str | None = None) -> None:
         """
         Initialize Gemini embedding service.
 
         Args:
             api_key: Google AI API key
-            model: Embedding model name (default: models/embedding-001)
+            model: Embedding model name (default: from GEMINI_EMBEDDING_MODEL env var)
         """
         self.client = genai.Client(api_key=api_key)
-        self.model = model
+        self.model = model or DEFAULT_EMBEDDING_MODEL
 
     async def embed(self, text: str) -> list[float]:
         """
@@ -57,12 +61,14 @@ class GeminiEmbeddingService:
             text: Text to embed (will be truncated to token limit)
 
         Returns:
-            768-dimensional embedding vector
+            3072-dimensional embedding vector
         """
         truncated = truncate_to_token_limit(text)
 
         def _embed_sync() -> list[float]:
-            result = self.client.models.embed_content(model=self.model, contents=truncated)
+            result = self.client.models.embed_content(
+                model=self.model, contents=truncated
+            )
             embeddings = result.embeddings
             if not embeddings:
                 raise ValueError("No embeddings returned")
@@ -81,14 +87,16 @@ class GeminiEmbeddingService:
             texts: List of texts to embed
 
         Returns:
-            List of 768-dimensional embedding vectors
+            List of 3072-dimensional embedding vectors
         """
         truncated_texts = [truncate_to_token_limit(text) for text in texts]
 
         def _embed_batch_sync() -> list[list[float]]:
             results: list[list[float]] = []
             for text in truncated_texts:
-                result = self.client.models.embed_content(model=self.model, contents=text)
+                result = self.client.models.embed_content(
+                    model=self.model, contents=text
+                )
                 embeddings = result.embeddings
                 if embeddings is None or len(embeddings) == 0:
                     raise ValueError("No embeddings returned")

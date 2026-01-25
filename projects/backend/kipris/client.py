@@ -22,7 +22,9 @@ from kipris.models import (
 class KIPRISClient:
     def __init__(self, service_key: str, timeout: float = 30.0) -> None:
         self._service_key = service_key
-        self._base_url = "http://plus.kipris.or.kr/kipo-api/kipi/patUtiModInfoSearchSevice"
+        self._base_url = (
+            "http://plus.kipris.or.kr/kipo-api/kipi/patUtiModInfoSearchSevice"
+        )
         self._client = httpx.AsyncClient(timeout=httpx.Timeout(timeout, connect=10.0))
 
     async def __aenter__(self) -> Self:
@@ -97,7 +99,9 @@ class KIPRISClient:
 
         return save_path
 
-    async def get_announcement_pdf_info(self, application_number: str) -> PDFInfo | None:
+    async def get_announcement_pdf_info(
+        self, application_number: str
+    ) -> PDFInfo | None:
         query_params = {
             "applicationNumber": application_number,
             "ServiceKey": self._service_key,
@@ -163,15 +167,25 @@ class KIPRISClient:
         root = ET.fromstring(response.text)
 
         total_count_elem = root.find(".//totalSearchCount")
-        total_count = int(total_count_elem.text) if total_count_elem is not None and total_count_elem.text else 0
+        total_count = (
+            int(total_count_elem.text)
+            if total_count_elem is not None and total_count_elem.text
+            else 0
+        )
 
         docs_start_elem = root.find(".//docsStart")
-        docs_start = int(docs_start_elem.text) if docs_start_elem is not None and docs_start_elem.text else 1
+        docs_start = (
+            int(docs_start_elem.text)
+            if docs_start_elem is not None and docs_start_elem.text
+            else 1
+        )
 
         items = root.findall(".//PatentUtilityInfo")
 
         if not items:
-            return IPCSearchResponse(results=[], docs_start=docs_start, total_count=total_count)
+            return IPCSearchResponse(
+                results=[], docs_start=docs_start, total_count=total_count
+            )
 
         results = []
         for item in items:
@@ -182,7 +196,9 @@ class KIPRISClient:
             result = IPCSearchResult(**data)
             results.append(result)
 
-        return IPCSearchResponse(results=results, docs_start=docs_start, total_count=total_count)
+        return IPCSearchResponse(
+            results=results, docs_start=docs_start, total_count=total_count
+        )
 
     async def free_search(self, params: FreeSearchParams) -> FreeSearchResponse:
         query_params = params.model_dump(by_alias=True, exclude_none=True)
@@ -194,16 +210,26 @@ class KIPRISClient:
 
         root = ET.fromstring(response.text)
 
-        total_count_elem = root.find(".//totalSearchCount")
-        total_count = int(total_count_elem.text) if total_count_elem is not None and total_count_elem.text else 0
+        total_count_elem = root.find(".//TotalSearchCount")
+        total_count = (
+            int(total_count_elem.text)
+            if total_count_elem is not None and total_count_elem.text
+            else 0
+        )
 
         docs_start_elem = root.find(".//docsStart")
-        docs_start = int(docs_start_elem.text) if docs_start_elem is not None and docs_start_elem.text else 1
+        docs_start = (
+            int(docs_start_elem.text)
+            if docs_start_elem is not None and docs_start_elem.text
+            else 1
+        )
 
         items = root.findall(".//PatentUtilityInfo")
 
         if not items:
-            return FreeSearchResponse(results=[], docs_start=docs_start, total_count=total_count)
+            return FreeSearchResponse(
+                results=[], docs_start=docs_start, total_count=total_count
+            )
 
         results = []
         for item in items:
@@ -214,4 +240,6 @@ class KIPRISClient:
             result = FreeSearchResult(**data)
             results.append(result)
 
-        return FreeSearchResponse(results=results, docs_start=docs_start, total_count=total_count)
+        return FreeSearchResponse(
+            results=results, docs_start=docs_start, total_count=total_count
+        )

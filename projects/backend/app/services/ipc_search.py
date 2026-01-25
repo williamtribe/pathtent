@@ -63,7 +63,7 @@ class IpcSearchService:
 
         # Load embeddings
         npz_data = np.load(embeddings_path, allow_pickle=True)
-        self.embeddings: np.ndarray = npz_data["embeddings"]  # (N, 768)
+        self.embeddings: np.ndarray = npz_data["embeddings"]  # (N, 3072)
         self.codes: list[str] = npz_data["codes"].tolist()  # N codes
 
         # Normalize embeddings for cosine similarity (dot product after normalization)

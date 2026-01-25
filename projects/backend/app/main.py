@@ -6,14 +6,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import router as search_router
 from app.api.patent_routes import router as patent_router
 from app.api.formula_routes import router as formula_router
+from app.api.collection_routes import router as collection_router
+from app.api.lda_routes import router as lda_router
 
 app = FastAPI(
     title="Patent Specification Generator API",
-    description="연구 논문/보고서를 분석하여 특허 명세서를 생성하는 API",
+    description="API for analyzing research papers and generating patent specifications",
     version="0.1.0",
 )
 
-# CORS 설정 - 환경 변수로 프론트엔드 URL 추가 가능
+# CORS configuration - frontend URL can be added via environment variable
 allowed_origins = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
@@ -35,11 +37,17 @@ async def health_check() -> dict[str, str]:
     return {"status": "ok"}
 
 
-# 기존 특허 검색 API (DB 필요)
+# Existing patent search API (requires DB)
 app.include_router(search_router, prefix="/api/v1")
 
-# 새로운 특허 명세서 생성 API (DB 불필요)
+# Patent specification generation API (no DB required)
 app.include_router(patent_router, prefix="/api/v1")
 
-# 검색식 생성 API
-app.include_router(formula_router, prefix="/api/v1/patent")
+# Formula generation API
+app.include_router(formula_router, prefix="/api/v1")
+
+# Patent collection API (KIPRIS)
+app.include_router(collection_router, prefix="/api/v1")
+
+# LDA topic modeling API
+app.include_router(lda_router, prefix="/api/v1")

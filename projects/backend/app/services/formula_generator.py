@@ -44,17 +44,11 @@ RFC 2119에서 설명하는 대로 해석합니다.
 </strategy>
 
 <rules>
-- MUST: 키워드는 한글로 작성 (영어 snake_case 금지)
-- MUST: 발명의 본질을 정의하는 3-5개의 핵심 키워드 추출
-- MUST: 각 키워드에 대해 3-7개의 동의어 제공
-- MUST: 키워드와 동의어는 검색 가능한 단어/용어만 포함
-- MUST: 각 동의어는 하나의 단어 또는 짧은 용어만 포함
+- MUST: 키워드는 한글로 작성 (영문 약어 AI, EV 등은 허용)
+- MUST: 핵심 키워드 3-5개, 각 키워드당 동의어 3-7개
+- MUST: 각 동의어는 단일 단어 또는 짧은 용어만 (설명 없이 깔끔하게)
 - SHOULD: 유사하지만 관련 없는 특허 분야의 용어 제외
-- MUST NOT: 영어 snake_case 키워드 사용 금지 (예: artificial_intelligence → 인공지능)
-- MUST NOT: 설명, 주석, 부연설명 추가 금지
-- MUST NOT: "관련키워드", "관련기술자료", "포함", "등", "X" 같은 접미사/접두사 금지
-- MUST NOT: 괄호 안에 설명 추가 금지
-- MUST NOT: 여러 단어를 공백 없이 붙이기 금지
+- MUST NOT: 동의어에 부연설명이나 접미사 붙이지 않기
 </rules>
 
 <output_format>
@@ -84,21 +78,7 @@ Output:
 }
 </example_good>
 
-<example_bad>
-다음과 같이 출력하면 안 됩니다:
-{
-  "keywords": ["artificial_intelligence", "control_system", "braking_system"],
-  "synonyms": {
-    "artificial_intelligence": ["AI관련키워드X AI", "머신러닝관련기술자료X 머신러닝"],
-    "control_system": ["제어 로직관련기술자료X 제어 로직", "ECU포함"],
-    "braking_system": ["리타더관련키워드X 리타더", "회생제동 등"]
-  }
-}
-위 예시의 문제점:
-1. 키워드가 영어 snake_case (artificial_intelligence → 인공지능으로 써야 함)
-2. "관련키워드X", "관련기술자료X", "포함", "등" 같은 쓰레기 텍스트
-3. 여러 단어를 공백 없이 붙임
-</example_bad>
+
 """
 
 
@@ -140,18 +120,11 @@ RFC 2119에서 설명하는 대로 해석합니다.
 </feedback_types>
 
 <rules>
-- MUST: 키워드는 한글로 작성 (영어 snake_case 금지)
-- MUST: 핵심 검색 의도 유지
-- MUST: 피드백에 따른 점진적 조정
-- MUST: 키워드와 동의어는 검색 가능한 단어/용어만 포함
-- MUST: 각 동의어는 하나의 단어 또는 짧은 용어만 포함
+- MUST: 키워드는 한글로 작성 (영문 약어 AI, EV 등은 허용)
+- MUST: 핵심 검색 의도 유지하며 피드백에 따라 점진적 조정
+- MUST: 각 동의어는 단일 단어 또는 짧은 용어만 (설명 없이 깔끔하게)
 - SHOULD: 변경 사항과 이유 설명
-- SHOULD: 추가 개선을 위한 다음 단계 제안
-- MUST NOT: 영어 snake_case 키워드 사용 금지 (예: artificial_intelligence → 인공지능)
-- MUST NOT: 설명, 주석, 부연설명 추가 금지
-- MUST NOT: "관련키워드", "관련기술자료", "포함", "등", "X" 같은 접미사/접두사 금지
-- MUST NOT: 괄호 안에 설명 추가 금지
-- MUST NOT: 여러 단어를 공백 없이 붙이기 금지
+- MUST NOT: 동의어에 부연설명이나 접미사 붙이지 않기
 </rules>
 
 <input_context>
@@ -188,19 +161,7 @@ Return structured JSON with:
 }
 </example_good>
 
-<example_bad>
-다음과 같이 출력하면 안 됩니다:
-{
-  "keywords": ["artificial_intelligence", "electric_vehicle"],
-  "synonyms": {
-    "artificial_intelligence": ["AI관련키워드X AI", "머신러닝포함"],
-    "electric_vehicle": ["EV관련키워드X EV", "전기자동차 등"]
-  }
-}
-위 예시의 문제점:
-1. 키워드가 영어 snake_case (인공지능, 전기차로 써야 함)
-2. "관련키워드X", "포함", "등" 같은 쓰레기 텍스트
-</example_bad>
+
 """
 
 
@@ -291,6 +252,7 @@ class _FormulaImproveAgentSingleton:
                 raise ModelRetry("Provide at least one keyword.")
             if not result.explanation:
                 raise ModelRetry("Explain what changes were made to the keywords.")
+
             return result
 
         return agent
