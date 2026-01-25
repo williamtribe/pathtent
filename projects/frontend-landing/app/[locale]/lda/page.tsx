@@ -10,10 +10,12 @@ import {
   Info,
   FileText,
   BarChart3,
+  ExternalLink,
 } from "lucide-react"
 import {
   collectPatents,
   analyzeLDA,
+  openLDAVisualization,
   type CollectResponse,
   type LDAResponse,
   type Topic,
@@ -25,6 +27,7 @@ export default function LDAPage() {
   const [numTopics, setNumTopics] = useState<number | "auto">("auto")
   const [isCollecting, setIsCollecting] = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [isLoadingViz, setIsLoadingViz] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [collectResult, setCollectResult] = useState<CollectResponse | null>(null)
   const [ldaResult, setLdaResult] = useState<LDAResponse | null>(null)
@@ -99,6 +102,29 @@ export default function LDAPage() {
         )
         return { ...d, patent }
       })
+  }
+
+  const handleOpenVisualization = async () => {
+    if (!collectResult) return
+
+    setIsLoadingViz(true)
+    setError(null)
+
+    try {
+      const patents = collectResult.patents.map((p) => ({
+        id: p.application_number,
+        text: `${p.title} ${p.abstract || ""}`,
+      }))
+
+      await openLDAVisualization({
+        patents,
+        num_topics: numTopics,
+      })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load visualization.")
+    } finally {
+      setIsLoadingViz(false)
+    }
   }
 
   return (
@@ -220,7 +246,7 @@ export default function LDAPage() {
 
               <button
                 onClick={handleAnalyze}
-                disabled={isAnalyzing || isCollecting}
+                disabled={isAnalyzing || isCollecting || isLoadingViz}
                 className="flex items-center gap-2 rounded-lg bg-primary px-6 py-3 font-semibold text-white transition-all hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isAnalyzing ? (
@@ -235,6 +261,26 @@ export default function LDAPage() {
                   </>
                 )}
               </button>
+
+              {ldaResult && (
+                <button
+                  onClick={handleOpenVisualization}
+                  disabled={isLoadingViz || isAnalyzing}
+                  className="flex items-center gap-2 rounded-lg border border-primary bg-white px-6 py-3 font-semibold text-primary transition-all hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isLoadingViz ? (
+                    <>
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      Loading...
+                    </>
+                  ) : (
+                    <>
+                      <ExternalLink className="h-5 w-5" />
+                      Open Visualization
+                    </>
+                  )}
+                </button>
+              )}
             </div>
           </motion.div>
         )}

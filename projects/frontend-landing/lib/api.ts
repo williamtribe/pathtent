@@ -545,6 +545,35 @@ export async function analyzeLDA(request: LDARequest): Promise<LDAResponse> {
   return response.json()
 }
 
+/**
+ * Get pyLDAvis interactive visualization HTML
+ * Opens in new tab for full-screen exploration
+ */
+export async function openLDAVisualization(request: LDARequest): Promise<void> {
+  if (MOCK_MODE) {
+    console.log('[MOCK] LDA Visualization not available in mock mode')
+    return
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/v1/analysis/lda/viz`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(request),
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Unknown error' }))
+    throw new Error(error.detail || `HTTP ${response.status}`)
+  }
+
+  const html = await response.text()
+  const blob = new Blob([html], { type: 'text/html' })
+  const url = URL.createObjectURL(blob)
+  window.open(url, '_blank')
+}
+
 // ============================================================================
 // SNA Types
 // ============================================================================
