@@ -84,21 +84,7 @@ Output:
 }
 </example_good>
 
-<example_bad>
-다음과 같이 출력하면 안 됩니다:
-{
-  "keywords": ["artificial_intelligence", "control_system", "braking_system"],
-  "synonyms": {
-    "artificial_intelligence": ["AI관련키워드X AI", "머신러닝관련기술자료X 머신러닝"],
-    "control_system": ["제어 로직관련기술자료X 제어 로직", "ECU포함"],
-    "braking_system": ["리타더관련키워드X 리타더", "회생제동 등"]
-  }
-}
-위 예시의 문제점:
-1. 키워드가 영어 snake_case (artificial_intelligence → 인공지능으로 써야 함)
-2. "관련키워드X", "관련기술자료X", "포함", "등" 같은 쓰레기 텍스트
-3. 여러 단어를 공백 없이 붙임
-</example_bad>
+
 """
 
 
@@ -188,19 +174,7 @@ Return structured JSON with:
 }
 </example_good>
 
-<example_bad>
-다음과 같이 출력하면 안 됩니다:
-{
-  "keywords": ["artificial_intelligence", "electric_vehicle"],
-  "synonyms": {
-    "artificial_intelligence": ["AI관련키워드X AI", "머신러닝포함"],
-    "electric_vehicle": ["EV관련키워드X EV", "전기자동차 등"]
-  }
-}
-위 예시의 문제점:
-1. 키워드가 영어 snake_case (인공지능, 전기차로 써야 함)
-2. "관련키워드X", "포함", "등" 같은 쓰레기 텍스트
-</example_bad>
+
 """
 
 
@@ -244,6 +218,8 @@ class _FormulaGenerateAgentSingleton:
         async def validate_keywords(
             ctx: RunContext[None], result: AIFormulaOutput
         ) -> AIFormulaOutput:
+            import re
+
             # Validate keywords count
             if len(result.keywords) < 2:
                 raise ModelRetry(
@@ -255,6 +231,29 @@ class _FormulaGenerateAgentSingleton:
                 raise ModelRetry(
                     "Provide synonyms for each keyword. Missing synonym mappings."
                 )
+
+            # Check for snake_case keywords (romanized Korean)
+            snake_case_pattern = re.compile(r"^[a-z]+(_[a-z]+)+$")
+            for kw in result.keywords:
+                if snake_case_pattern.match(kw):
+                    raise ModelRetry(
+                        f"Keyword '{kw}' is snake_case. Use Korean: 인공지능, 전기차, etc."
+                    )
+
+            # Check for garbage patterns in synonyms
+            garbage_patterns = ["관련키워드", "관련기술", "자료X", "포함", " 등"]
+            for kw, syns in result.synonyms.items():
+                if snake_case_pattern.match(kw):
+                    raise ModelRetry(
+                        f"Synonym key '{kw}' is snake_case. Use Korean keywords."
+                    )
+                for syn in syns:
+                    for garbage in garbage_patterns:
+                        if garbage in syn:
+                            raise ModelRetry(
+                                f"Synonym '{syn}' contains garbage text '{garbage}'. "
+                                "Use clean Korean terms only."
+                            )
 
             return result
 
@@ -287,10 +286,33 @@ class _FormulaImproveAgentSingleton:
         async def validate_improved_keywords(
             ctx: RunContext[None], result: AIFormulaOutput
         ) -> AIFormulaOutput:
+            import re
+
             if len(result.keywords) < 1:
                 raise ModelRetry("Provide at least one keyword.")
             if not result.explanation:
                 raise ModelRetry("Explain what changes were made to the keywords.")
+
+            # Check for snake_case keywords
+            snake_case_pattern = re.compile(r"^[a-z]+(_[a-z]+)+$")
+            for kw in result.keywords:
+                if snake_case_pattern.match(kw):
+                    raise ModelRetry(
+                        f"Keyword '{kw}' is snake_case. Use Korean: 인공지능, 전기차, etc."
+                    )
+
+            # Check for garbage patterns
+            garbage_patterns = ["관련키워드", "관련기술", "자료X", "포함", " 등"]
+            for kw, syns in result.synonyms.items():
+                if snake_case_pattern.match(kw):
+                    raise ModelRetry(f"Key '{kw}' is snake_case. Use Korean.")
+                for syn in syns:
+                    for garbage in garbage_patterns:
+                        if garbage in syn:
+                            raise ModelRetry(
+                                f"Synonym '{syn}' has garbage '{garbage}'. Use clean terms."
+                            )
+
             return result
 
         return agent
