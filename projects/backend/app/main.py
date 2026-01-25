@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import router as search_router
 from app.api.patent_routes import router as patent_router
+from app.api.formula_routes import router as formula_router
 from app.api.collection_routes import router as collection_router
 from app.api.lda_routes import router as lda_router
 
@@ -41,6 +42,9 @@ app.include_router(search_router, prefix="/api/v1")
 
 # Patent specification generation API (no DB required)
 app.include_router(patent_router, prefix="/api/v1")
+
+# Formula generation API
+app.include_router(formula_router, prefix="/api/v1")
 
 # Patent collection API (KIPRIS)
 app.include_router(collection_router, prefix="/api/v1")
