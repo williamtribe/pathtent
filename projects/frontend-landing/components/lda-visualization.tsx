@@ -46,7 +46,7 @@ export function LDAVisualization({
   const [selectedTopicId, setSelectedTopicId] = useState<number | null>(null)
   const [activeTab, setActiveTab] = useState<"overview" | "keywords" | "documents">("overview")
 
-  // Process topic data with real PCA coordinates
+  // Process topic data with real MDS coordinates (Jensen-Shannon divergence)
   const topicData = useMemo(() => {
     const topicCounts = new Map<number, number>()
     ldaResult.documents.forEach((doc) => {
@@ -55,9 +55,9 @@ export function LDAVisualization({
 
     return ldaResult.topics.map((topic, idx) => {
       const count = topicCounts.get(topic.id) || 0
-      // Use real PCA coordinates from backend, fallback to simple layout
-      const x = topic.coordinate?.x ?? (50 + 30 * Math.cos((idx / ldaResult.topics.length) * 2 * Math.PI))
-      const y = topic.coordinate?.y ?? (50 + 30 * Math.sin((idx / ldaResult.topics.length) * 2 * Math.PI))
+      // Use real MDS coordinates from backend (centered at origin)
+      const x = topic.coordinate?.x ?? 0
+      const y = topic.coordinate?.y ?? 0
       
       return {
         ...topic,
@@ -66,11 +66,18 @@ export function LDAVisualization({
         z: count,
         count,
         color: COLORS[idx % COLORS.length],
-        // Use backend label or generate from keywords
         displayLabel: topic.label || topic.keywords.slice(0, 3).join(", "),
       }
     })
   }, [ldaResult])
+
+  // Calculate axis domain to center at origin with padding
+  const axisDomain = useMemo(() => {
+    if (topicData.length === 0) return { min: -1, max: 1 }
+    const allCoords = topicData.flatMap((t) => [Math.abs(t.x), Math.abs(t.y)])
+    const maxAbs = Math.max(...allCoords, 0.1) * 1.2 // 20% padding
+    return { min: -maxAbs, max: maxAbs }
+  }, [topicData])
 
   // Pie chart data with keyword labels
   const pieData = useMemo(() => {
@@ -165,33 +172,35 @@ export function LDAVisualization({
             exit={{ opacity: 0, y: -10 }}
             className="grid grid-cols-1 gap-6 lg:grid-cols-2"
           >
-            {/* Topic Map (Real PCA) */}
+            {/* Topic Map (Jensen-Shannon Divergence + MDS) */}
             <div className="rounded-xl border border-border bg-surface p-4">
               <h4 className="mb-1 text-sm font-semibold text-text">
-                Topic Map (PCA)
+                Topic Map
               </h4>
               <p className="mb-3 text-xs text-text-muted">
-                Position reflects topic similarity. Click to explore.
+                Distance = Jensen-Shannon divergence. Similar topics cluster together.
               </p>
               <ResponsiveContainer width="100%" height={300}>
-                <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                <ScatterChart margin={{ top: 20, right: 20, bottom: 30, left: 40 }}>
                   <XAxis 
                     type="number" 
                     dataKey="x" 
-                    domain={[0, 100]} 
+                    domain={[axisDomain.min, axisDomain.max]} 
                     tick={{ fontSize: 10 }}
                     tickLine={false}
-                    axisLine={{ stroke: "#e5e7eb" }}
-                    label={{ value: "PC1", position: "bottom", fontSize: 11, fill: "#6b7280" }}
+                    axisLine={{ stroke: "#d1d5db" }}
+                    tickFormatter={(v) => v.toFixed(2)}
+                    label={{ value: "MDS Dimension 1", position: "bottom", offset: 15, fontSize: 11, fill: "#6b7280" }}
                   />
                   <YAxis 
                     type="number" 
                     dataKey="y" 
-                    domain={[0, 100]} 
+                    domain={[axisDomain.min, axisDomain.max]} 
                     tick={{ fontSize: 10 }}
                     tickLine={false}
-                    axisLine={{ stroke: "#e5e7eb" }}
-                    label={{ value: "PC2", angle: -90, position: "left", fontSize: 11, fill: "#6b7280" }}
+                    axisLine={{ stroke: "#d1d5db" }}
+                    tickFormatter={(v) => v.toFixed(2)}
+                    label={{ value: "MDS Dimension 2", angle: -90, position: "insideLeft", offset: 10, fontSize: 11, fill: "#6b7280" }}
                   />
                   <ZAxis type="number" dataKey="z" range={[300, 1500]} />
                   <Tooltip

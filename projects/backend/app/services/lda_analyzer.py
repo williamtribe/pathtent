@@ -7,7 +7,8 @@ from pathlib import Path
 import numpy as np
 from gensim import corpora
 from gensim.models import CoherenceModel, LdaModel
-from sklearn.decomposition import PCA
+from scipy.spatial.distance import jensenshannon
+from sklearn.manifold import MDS
 
 from app.schemas.lda import (
     DocumentTopic,
@@ -215,23 +216,35 @@ class LDAAnalyzer:
             )
             coherence_score = coherence_model.get_coherence()
 
-            # Extract topic-word distribution matrix for PCA
+            # Extract topic-word distribution matrix
             topic_word_matrix = model.get_topics()  # shape: (num_topics, vocab_size)
 
-            # Compute PCA for 2D visualization
+            # Compute 2D coordinates using Jensen-Shannon Divergence + MDS
+            # This is the same method used by pyLDAvis
             if num_topics >= 2:
-                pca = PCA(n_components=2)
-                topic_coords_2d = pca.fit_transform(topic_word_matrix)
-                # Normalize to 0-100 range for visualization
-                coords_min = topic_coords_2d.min(axis=0)
-                coords_max = topic_coords_2d.max(axis=0)
-                coords_range = coords_max - coords_min
-                coords_range[coords_range == 0] = 1  # Avoid division by zero
-                topic_coords_normalized = (
-                    (topic_coords_2d - coords_min) / coords_range
-                ) * 80 + 10  # 10-90 range
+                # Compute pairwise Jensen-Shannon divergence matrix
+                n_topics = topic_word_matrix.shape[0]
+                js_distances = np.zeros((n_topics, n_topics))
+                for i in range(n_topics):
+                    for j in range(i + 1, n_topics):
+                        # Jensen-Shannon divergence (symmetric, bounded 0-1)
+                        js_dist = jensenshannon(
+                            topic_word_matrix[i], topic_word_matrix[j]
+                        )
+                        js_distances[i, j] = js_dist
+                        js_distances[j, i] = js_dist
+
+                # Apply MDS to project to 2D while preserving distances
+                mds = MDS(
+                    n_components=2,
+                    dissimilarity="precomputed",
+                    random_state=42,
+                    normalized_stress="auto",
+                )
+                topic_coords_2d = mds.fit_transform(js_distances)
+                # MDS output is centered at origin - keep it that way for truthful viz
             else:
-                topic_coords_normalized = np.array([[50, 50]])
+                topic_coords_2d = np.array([[0.0, 0.0]])
 
             # Extract topics with keywords, coordinates, and labels
             topics: list[Topic] = []
@@ -241,10 +254,10 @@ class LDAAnalyzer:
                 keywords = [word for word, _ in topic_terms]
                 weight = sum(prob for _, prob in topic_terms)
 
-                # Create coordinate from PCA
+                # Create coordinate from MDS projection (preserves JS divergence distances)
                 coord = TopicCoordinate(
-                    x=float(topic_coords_normalized[topic_id, 0]),
-                    y=float(topic_coords_normalized[topic_id, 1]),
+                    x=float(topic_coords_2d[topic_id, 0]),
+                    y=float(topic_coords_2d[topic_id, 1]),
                 )
 
                 # Generate label from top 3 keywords
