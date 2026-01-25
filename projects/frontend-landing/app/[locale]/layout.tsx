@@ -6,6 +6,7 @@ import { routing } from '@/i18n/routing'
 import { GeistSans } from 'geist/font/sans'
 import { GeistMono } from 'geist/font/mono'
 import { Inter, IBM_Plex_Sans } from 'next/font/google'
+import { Header } from '@/components/layout/header'
 import '../globals.css'
 
 const inter = Inter({
@@ -57,7 +58,8 @@ export default async function LocaleLayout({
     >
       <body className="font-[family-name:var(--font-inter)] bg-white text-text">
         <NextIntlClientProvider messages={messages}>
-          {children}
+          <Header />
+          <div className="pt-16">{children}</div>
         </NextIntlClientProvider>
       </body>
     </html>
