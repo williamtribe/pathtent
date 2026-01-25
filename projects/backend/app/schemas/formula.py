@@ -69,6 +69,94 @@ class FormulaImproveRequest(BaseModel):
     )
 
 
+class FormulaBlock(BaseModel):
+    """Represents a single keyword block in the formula builder."""
+
+    id: str = Field(
+        ...,
+        description="Unique identifier for the block (e.g., 'block-1')",
+    )
+    name: str = Field(
+        ...,
+        description="Display name for the block (e.g., 'Core Keywords')",
+    )
+    field: str = Field(
+        default="TAC",
+        description="Search field: TAC (title+abstract+claims), TI, AB, CL, IPC",
+    )
+    keywords: list[str] = Field(
+        default_factory=list,
+        description="Keywords in this block",
+    )
+    operator: str = Field(
+        default="OR",
+        description="Operator within the block (OR or AND)",
+    )
+
+
+class FormulaBlocksResponse(BaseModel):
+    """Response model with block-based formula structure for user editing."""
+
+    blocks: list[FormulaBlock] = Field(
+        default_factory=list,
+        description="List of keyword blocks",
+    )
+    block_operators: list[str] = Field(
+        default_factory=list,
+        description="Operators between blocks (AND/OR). Length = len(blocks) - 1",
+    )
+    assembled_formula: str = Field(
+        default="",
+        description="The assembled KIPRIS search formula string",
+    )
+    ipc_codes: list[str] = Field(
+        default_factory=list,
+        description="Recommended IPC classification codes",
+    )
+    excluded_terms: list[str] = Field(
+        default_factory=list,
+        description="Terms excluded using NOT operator",
+    )
+    explanation: str = Field(
+        default="",
+        description="Explanation of the formula structure",
+    )
+    tips: list[str] = Field(
+        default_factory=list,
+        description="Tips for refining the formula",
+    )
+
+
+class FormulaAssembleResponse(BaseModel):
+    """Response model for assembled formula from user-edited blocks."""
+
+    assembled_formula: str = Field(
+        ...,
+        description="The assembled KIPRIS search formula string",
+    )
+
+
+class FormulaAssembleRequest(BaseModel):
+    """Request model for assembling a formula from user-edited blocks."""
+
+    blocks: list[FormulaBlock] = Field(
+        ...,
+        description="User-edited keyword blocks",
+    )
+    block_operators: list[str] = Field(
+        ...,
+        description="Operators between blocks (AND/OR)",
+    )
+    ipc_codes: list[str] = Field(
+        default_factory=list,
+        description="IPC codes to include",
+    )
+    excluded_terms: list[str] = Field(
+        default_factory=list,
+        description="Terms to exclude using NOT",
+    )
+
+
 class FormulaResult(BaseModel):
     """Response model containing the generated KIPRIS search formula."""
 

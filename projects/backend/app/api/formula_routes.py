@@ -7,11 +7,19 @@ Provides endpoints for generating and improving patent search formulas.
 from fastapi import APIRouter, HTTPException
 
 from app.schemas.formula import (
+    FormulaAssembleRequest,
+    FormulaAssembleResponse,
+    FormulaBlocksResponse,
     FormulaGenerateRequest,
     FormulaImproveRequest,
     FormulaResult,
 )
-from app.services.formula_generator import generate_formula, improve_formula
+from app.services.formula_generator import (
+    assemble_formula_from_blocks,
+    generate_formula,
+    generate_formula_blocks,
+    improve_formula,
+)
 
 router = APIRouter(tags=["formula"])
 
@@ -61,4 +69,57 @@ async def improve_search_formula(request: FormulaImproveRequest) -> FormulaResul
         raise HTTPException(
             status_code=500,
             detail=f"Formula improvement failed: {e!s}",
+        )
+
+
+@router.post("/formula/generate-blocks", response_model=FormulaBlocksResponse)
+async def generate_search_formula_blocks(
+    request: FormulaGenerateRequest,
+) -> FormulaBlocksResponse:
+    """
+    Generate a block-based KIPRIS search formula from invention description.
+
+    Returns keyword blocks that users can edit, along with the assembled formula.
+    Each block contains related keywords with configurable field and operator settings.
+    """
+    try:
+        result = await generate_formula_blocks(
+            text=request.text,
+            options=request.options,
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Formula block generation failed: {e!s}",
+        )
+
+
+@router.post("/formula/assemble", response_model=FormulaAssembleResponse)
+async def assemble_search_formula(
+    request: FormulaAssembleRequest,
+) -> FormulaAssembleResponse:
+    """
+    Assemble a KIPRIS search formula from user-edited blocks.
+
+    Takes user-modified keyword blocks and operators, and returns
+    the assembled formula string ready for KIPRIS search.
+    """
+    try:
+        formula = await assemble_formula_from_blocks(
+            blocks=request.blocks,
+            block_operators=request.block_operators,
+            ipc_codes=request.ipc_codes,
+            excluded_terms=request.excluded_terms,
+        )
+        return FormulaAssembleResponse(assembled_formula=formula)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid block configuration: {e!s}",
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Formula assembly failed: {e!s}",
         )

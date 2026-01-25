@@ -325,6 +325,28 @@ export interface FormulaResult {
   tips: string[]
 }
 
+export interface FormulaBlock {
+  id: string
+  name: string
+  field: string // TAC, TI, AB, CL, IPC
+  keywords: string[]
+  operator: string // OR, AND
+}
+
+export interface FormulaBlocksResponse {
+  blocks: FormulaBlock[]
+  block_operators: string[] // AND/OR between blocks
+  assembled_formula: string
+  ipc_codes: string[]
+  excluded_terms: string[]
+  explanation: string
+  tips: string[]
+}
+
+export interface FormulaAssembleResponse {
+  assembled_formula: string
+}
+
 // ============================================================================
 // Formula API
 // ============================================================================
@@ -380,6 +402,59 @@ export async function improveFormula(
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ detail: 'Unknown error' }))
+    throw new Error(error.detail || `HTTP ${response.status}`)
+  }
+
+  return response.json()
+}
+
+/**
+ * Generate a block-based KIPRIS search formula from invention description
+ */
+export async function generateFormulaBlocks(
+  text: string,
+  options?: FormulaOptions,
+): Promise<FormulaBlocksResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/formula/generate-blocks`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ text, options }),
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: "Unknown error" }))
+    throw new Error(error.detail || `HTTP ${response.status}`)
+  }
+
+  return response.json()
+}
+
+/**
+ * Assemble a KIPRIS search formula from user-edited blocks
+ */
+export async function assembleFormula(
+  blocks: FormulaBlock[],
+  blockOperators: string[],
+  ipcCodes?: string[],
+  excludedTerms?: string[],
+): Promise<FormulaAssembleResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/formula/assemble`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      blocks,
+      block_operators: blockOperators,
+      ipc_codes: ipcCodes || [],
+      excluded_terms: excludedTerms || [],
+    }),
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: "Unknown error" }))
     throw new Error(error.detail || `HTTP ${response.status}`)
   }
 

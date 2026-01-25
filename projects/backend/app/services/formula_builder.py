@@ -143,6 +143,116 @@ class FormulaBuilder:
         )
 
     @classmethod
+    def build_from_blocks(
+        cls,
+        blocks: list[dict],
+        block_operators: list[str],
+        ipc_codes: list[str] | None = None,
+        excluded_terms: list[str] | None = None,
+    ) -> str:
+        """
+        Build a KIPRIS search formula from user-edited blocks.
+
+        Uses KIPRIS keyword-based operators (AND/OR) with proper spacing.
+
+        Args:
+            blocks: List of block dicts with keys: id, name, field, keywords, operator
+            block_operators: Operators between blocks (AND/OR). Length = len(blocks) - 1
+            ipc_codes: Optional IPC codes to append
+            excluded_terms: Optional terms to exclude with NOT
+
+        Returns:
+            Valid KIPRIS search formula string
+
+        Example:
+            >>> blocks = [
+            ...     {"id": "b1", "name": "Core", "field": "TAC", "keywords": ["lithium*", "battery*"], "operator": "OR"},
+            ...     {"id": "b2", "name": "Process", "field": "TAC", "keywords": ["recover*", "extract*"], "operator": "OR"},
+            ... ]
+            >>> FormulaBuilder.build_from_blocks(blocks, ["AND"])
+            '((TI:((lithium* battery*))+AB:((lithium* battery*)))) AND (TI:((recover* extract*))+AB:((recover* extract*)))'
+        """
+        if not blocks:
+            raise ValueError("At least one block is required")
+
+        # Find valid blocks and track their original indices
+        valid_indices = [i for i, b in enumerate(blocks) if b.get("keywords")]
+        if not valid_indices:
+            raise ValueError("At least one block with keywords is required")
+
+        # Validate block_operators length against original blocks
+        expected_op_count = len(blocks) - 1
+        if len(block_operators) != expected_op_count:
+            raise ValueError(
+                f"block_operators must have {expected_op_count} elements, got {len(block_operators)}"
+            )
+
+        # Extract operators between consecutive valid blocks
+        # Operator i connects block i to block i+1, so for valid blocks at [0, 2],
+        # we need operator at min(0, 2-1) = 0, or we use the operator just before the next valid block
+        active_operators: list[str] = []
+        for i in range(len(valid_indices) - 1):
+            # Use the operator at the position of the current valid block
+            op_idx = valid_indices[i]
+            active_operators.append(block_operators[op_idx])
+
+        # Build each block's formula part
+        block_formulas: list[str] = []
+        for idx in valid_indices:
+            block = blocks[idx]
+            keywords = block.get("keywords", [])
+            field = block.get("field", "TAC")
+            inner_op = block.get("operator", "OR")
+
+            # Build keyword part with KIPRIS spacing (space for OR within blocks)
+            escaped_keywords = [cls._escape_term(k) for k in keywords]
+            if inner_op.upper() == "AND":
+                # AND within block: keyword1 AND keyword2
+                keyword_part = " AND ".join(escaped_keywords)
+            else:
+                # OR within block: space-separated (KIPRIS implicit OR)
+                keyword_part = " ".join(escaped_keywords)
+
+            if len(escaped_keywords) > 1:
+                keyword_part = f"({keyword_part})"
+
+            # Map TAC to TI+AB (KIPRIS has no TAC field, it's a convenience alias)
+            if field == "TAC":
+                # TAC = TI + AB combined with OR
+                block_formula = f"(TI:({keyword_part})+AB:({keyword_part}))"
+            else:
+                # Single field (TI, AB, CL, IPC)
+                block_formula = f"{field}:({keyword_part})"
+
+            block_formulas.append(block_formula)
+
+        if not block_formulas:
+            raise ValueError("No valid blocks with keywords found")
+
+        # Combine blocks with operators using KIPRIS keyword syntax with spacing
+        formula = block_formulas[0]
+        for i, op in enumerate(active_operators):
+            # Use keyword operators (AND/OR) with spaces for proper KIPRIS syntax
+            kipris_op = " AND " if op.upper() == "AND" else " OR "
+            formula = f"({formula}){kipris_op}{block_formulas[i + 1]}"
+
+        # Add exclusions with NOT keyword (using space-separated OR for keyword syntax)
+        if excluded_terms:
+            escaped_terms = [cls._escape_term(t) for t in excluded_terms]
+            if len(escaped_terms) == 1:
+                exclusion_section = escaped_terms[0]
+            else:
+                exclusion_section = f"({' '.join(escaped_terms)})"
+            formula = f"({formula}) AND NOT {exclusion_section}"
+
+        # Add IPC codes
+        if ipc_codes:
+            ipc_section = cls._build_ipc_section(ipc_codes)
+            formula = f"({formula}) AND {ipc_section}"
+
+        return formula
+
+    @classmethod
     def _build_keyword_groups(
         cls,
         keywords: list[str],

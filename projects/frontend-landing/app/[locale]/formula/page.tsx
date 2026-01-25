@@ -13,29 +13,41 @@ import {
   ThumbsDown,
   ThumbsUp,
   AlertCircle,
+  LayoutGrid,
+  List,
 } from 'lucide-react'
 import {
   generateFormula,
+  generateFormulaBlocks,
   improveFormula,
   type FormulaResult,
+  type FormulaBlocksResponse,
 } from '../../../lib/api'
+import { FormulaBuilder } from '../../../components/formula-builder'
 
 type FeedbackType = 'too_many' | 'too_few' | 'noisy' | null
+type ViewMode = 'classic' | 'blocks'
 
 export default function FormulaPage() {
+  // View mode state
+  const [viewMode, setViewMode] = useState<ViewMode>('blocks')
+
   // Input state
   const [inputText, setInputText] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Result state
+  // Result state (classic mode)
   const [result, setResult] = useState<FormulaResult | null>(null)
   const [copied, setCopied] = useState(false)
+
+  // Block result state (blocks mode)
+  const [blocksResult, setBlocksResult] = useState<FormulaBlocksResponse | null>(null)
 
   // Feedback state
   const [showFeedback, setShowFeedback] = useState(false)
   const [selectedFeedback, setSelectedFeedback] = useState<FeedbackType>(null)
-  const [resultCount, setResultCount] = useState<string>('')
+  const [_resultCount, setResultCount] = useState<string>('')
   const [additionalContext, setAdditionalContext] = useState('')
   const [isImproving, setIsImproving] = useState(false)
 
@@ -51,12 +63,18 @@ export default function FormulaPage() {
     setIsLoading(true)
     setError(null)
     setResult(null)
+    setBlocksResult(null)
     setPreviousFormula(null)
     setShowFeedback(false)
 
     try {
-      const formulaResult = await generateFormula(inputText)
-      setResult(formulaResult)
+      if (viewMode === 'blocks') {
+        const blocksResponse = await generateFormulaBlocks(inputText)
+        setBlocksResult(blocksResponse)
+      } else {
+        const formulaResult = await generateFormula(inputText)
+        setResult(formulaResult)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : '검색식 생성 중 오류가 발생했습니다.')
     } finally {
@@ -106,6 +124,7 @@ export default function FormulaPage() {
   const handleReset = () => {
     setInputText('')
     setResult(null)
+    setBlocksResult(null)
     setError(null)
     setShowFeedback(false)
     setSelectedFeedback(null)
@@ -117,10 +136,40 @@ export default function FormulaPage() {
       {/* Header */}
       <header className="border-b border-border bg-white px-6 py-6">
         <div className="mx-auto max-w-4xl">
-          <h1 className="text-3xl font-bold md:text-4xl">KIPRIS 검색식 생성기</h1>
-          <p className="mt-2 text-lg text-text-muted">
-            발명 아이디어를 입력하면 AI가 전문가급 특허 검색식을 생성해드립니다
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold md:text-4xl">KIPRIS 검색식 생성기</h1>
+              <p className="mt-2 text-lg text-text-muted">
+                발명 아이디어를 입력하면 AI가 전문가급 특허 검색식을 생성해드립니다
+              </p>
+            </div>
+
+            {/* Mode Toggle */}
+            <div className="flex items-center gap-2 rounded-lg border border-border bg-surface p-1">
+              <button
+                onClick={() => setViewMode('blocks')}
+                className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-all ${
+                  viewMode === 'blocks'
+                    ? 'bg-white text-primary shadow-sm'
+                    : 'text-text-muted hover:text-text'
+                }`}
+              >
+                <LayoutGrid className="h-4 w-4" />
+                블록 모드
+              </button>
+              <button
+                onClick={() => setViewMode('classic')}
+                className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-all ${
+                  viewMode === 'classic'
+                    ? 'bg-white text-primary shadow-sm'
+                    : 'text-text-muted hover:text-text'
+                }`}
+              >
+                <List className="h-4 w-4" />
+                클래식 모드
+              </button>
+            </div>
+          </div>
         </div>
       </header>
 
@@ -171,9 +220,68 @@ export default function FormulaPage() {
           </button>
         </div>
 
-        {/* Result Section */}
+        {/* Block-Based Result Section */}
         <AnimatePresence mode="wait">
-          {result && (
+          {viewMode === 'blocks' && blocksResult && (
+            <motion.div
+              key="blocks-result"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="mt-8 space-y-6"
+            >
+              {/* FormulaBuilder Component */}
+              <div className="rounded-lg border-2 border-primary bg-surface p-6">
+                <div className="mb-4 flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">검색식 블록 편집기</h3>
+                  <a
+                    href="https://kpat.kipris.or.kr/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-green-700"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    KIPRIS에서 검색
+                  </a>
+                </div>
+
+                <FormulaBuilder initialData={blocksResult} />
+              </div>
+
+              {/* Explanation */}
+              {blocksResult.explanation && (
+                <div className="rounded-lg border border-border bg-white p-6">
+                  <h3 className="mb-3 text-lg font-semibold">검색 전략 설명</h3>
+                  <p className="text-text-muted">{blocksResult.explanation}</p>
+                </div>
+              )}
+
+              {/* Tips */}
+              {blocksResult.tips.length > 0 && (
+                <div className="rounded-lg border-l-4 border-l-amber-500 bg-amber-50 p-6">
+                  <h3 className="mb-3 text-lg font-semibold text-amber-800">활용 팁</h3>
+                  <ul className="list-disc space-y-1 pl-5 text-amber-700">
+                    {blocksResult.tips.map((tip, idx) => (
+                      <li key={idx}>{tip}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Reset Button */}
+              <button
+                onClick={handleReset}
+                className="w-full rounded-lg border border-border py-3 font-medium transition-all hover:bg-surface"
+              >
+                새로운 검색식 생성하기
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Classic Result Section */}
+        <AnimatePresence mode="wait">
+          {viewMode === 'classic' && result && (
             <motion.div
               key="result"
               initial={{ opacity: 0, y: 20 }}
@@ -438,8 +546,8 @@ export default function FormulaPage() {
           )}
         </AnimatePresence>
 
-        {/* KIPRIS Syntax Guide */}
-        {!result && (
+        {/* KIPRIS Syntax Guide - show only when no results */}
+        {!result && !blocksResult && (
           <div className="mt-8 rounded-lg border border-border bg-surface p-6">
             <h3 className="mb-4 text-lg font-semibold">KIPRIS 검색식 문법 안내</h3>
             <div className="grid gap-4 md:grid-cols-2">

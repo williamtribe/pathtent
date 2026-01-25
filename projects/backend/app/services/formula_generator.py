@@ -11,7 +11,12 @@ from pydantic_ai.models.google import GoogleModel
 from pydantic_ai.providers.google import GoogleProvider
 
 from app.config import Settings
-from app.schemas.formula import FormulaOptions, FormulaResult
+from app.schemas.formula import (
+    FormulaBlock,
+    FormulaBlocksResponse,
+    FormulaOptions,
+    FormulaResult,
+)
 from app.services.formula_builder import FormulaBuilder, PrecisionLevel
 from app.services.ipc_search import IpcSearchService
 
@@ -405,4 +410,170 @@ async def improve_formula(
         excluded_terms=output.excluded_terms,
         explanation=output.explanation,
         tips=output.tips,
+    )
+
+
+async def generate_formula_blocks(
+    text: str,
+    options: FormulaOptions | None = None,
+) -> FormulaBlocksResponse:
+    """
+    Generate a block-based KIPRIS search formula from invention description.
+
+    Returns blocks that users can edit, with assembled formula.
+
+    Args:
+        text: Invention description or idea text
+        options: Optional configuration for formula generation
+
+    Returns:
+        FormulaBlocksResponse with editable blocks and assembled formula
+    """
+    settings = Settings()
+
+    # Build prompt with options if provided
+    prompt = text
+    if options:
+        prompt += f"\n\n[Options: precision={options.target_precision}"
+        if not options.include_synonyms:
+            prompt += ", minimal synonyms"
+        prompt += "]"
+
+    # Step 1: AI extracts keywords, synonyms, excluded terms
+    agent = formula_generate_agent()
+    result = await agent.run(prompt)
+    output = result.output
+
+    # Step 2: Get grounded IPC codes via embedding search
+    ipc_codes: list[str] = []
+    ipc_codes_raw: list[str] = []
+    if options is None or options.include_ipc:
+        ipc_service = IpcSearchService(api_key=settings.google_api_key)
+        ipc_results = await ipc_service.search(text, top_k=3)
+        ipc_codes = [f"{r.code}: {r.description[:50]}..." for r in ipc_results]
+        ipc_codes_raw = [r.code.replace(" ", "") for r in ipc_results]
+
+    # Step 3: Organize keywords into blocks
+    # Block 1: Core keywords (first 2-3 keywords with their synonyms combined)
+    # Block 2+: Additional keyword groups
+    blocks: list[FormulaBlock] = []
+    block_operators: list[str] = []
+
+    # Guard against empty keywords from AI
+    if not output.keywords:
+        return FormulaBlocksResponse(
+            blocks=[],
+            block_operators=[],
+            assembled_formula="",
+            ipc_codes=ipc_codes,
+            excluded_terms=output.excluded_terms,
+            explanation="No keywords could be extracted from the input.",
+            tips=["Try providing a more detailed invention description."],
+        )
+
+    for i, keyword in enumerate(output.keywords):
+        # Get synonyms for this keyword
+        keyword_synonyms = output.synonyms.get(keyword, [])
+        # Combine keyword with its synonyms as block keywords
+        all_terms = [keyword] + keyword_synonyms
+
+        # Determine block name based on index (English for code, localize in frontend)
+        if i == 0:
+            block_name = "Core Keywords"
+        elif i == 1:
+            block_name = "Technology Domain"
+        elif i == 2:
+            block_name = "Components"
+        else:
+            block_name = f"Keyword Group {i + 1}"
+
+        block = FormulaBlock(
+            id=f"block-{i + 1}",
+            name=block_name,
+            field="TAC",  # Default to Title+Abstract+Claims
+            keywords=all_terms,
+            operator="OR",  # Within block, keywords are OR'd
+        )
+        blocks.append(block)
+
+        # Add AND operator between blocks (except after last block)
+        if i < len(output.keywords) - 1:
+            block_operators.append("AND")
+
+    # Step 4: Build assembled formula using FormulaBuilder.build_from_blocks
+    blocks_as_dicts = [
+        {
+            "id": b.id,
+            "name": b.name,
+            "field": b.field,
+            "keywords": b.keywords,
+            "operator": b.operator,
+        }
+        for b in blocks
+    ]
+
+    assembled_formula = FormulaBuilder.build_from_blocks(
+        blocks=blocks_as_dicts,
+        block_operators=block_operators,
+        ipc_codes=ipc_codes_raw if ipc_codes_raw else None,
+        excluded_terms=output.excluded_terms if output.excluded_terms else None,
+    )
+
+    return FormulaBlocksResponse(
+        blocks=blocks,
+        block_operators=block_operators,
+        assembled_formula=assembled_formula,
+        ipc_codes=ipc_codes,
+        excluded_terms=output.excluded_terms,
+        explanation=output.explanation,
+        tips=output.tips,
+    )
+
+
+async def assemble_formula_from_blocks(
+    blocks: list[FormulaBlock],
+    block_operators: list[str],
+    ipc_codes: list[str] | None = None,
+    excluded_terms: list[str] | None = None,
+) -> str:
+    """
+    Assemble a KIPRIS formula from user-edited blocks.
+
+    Args:
+        blocks: User-edited keyword blocks
+        block_operators: Operators between blocks (AND/OR)
+        ipc_codes: Optional IPC codes to include
+        excluded_terms: Optional terms to exclude
+
+    Returns:
+        Assembled KIPRIS formula string
+    """
+    # Convert blocks to dict format for FormulaBuilder
+    blocks_as_dicts = [
+        {
+            "id": b.id,
+            "name": b.name,
+            "field": b.field,
+            "keywords": b.keywords,
+            "operator": b.operator,
+        }
+        for b in blocks
+    ]
+
+    # Clean IPC codes (remove descriptions if present)
+    clean_ipc_codes: list[str] | None = None
+    if ipc_codes:
+        clean_ipc_codes = []
+        for code in ipc_codes:
+            # Handle codes like "B60L: Electric propulsion..."
+            if ":" in code and not code.startswith("MIPC"):
+                clean_ipc_codes.append(code.split(":")[0].strip().replace(" ", ""))
+            else:
+                clean_ipc_codes.append(code.replace(" ", ""))
+
+    return FormulaBuilder.build_from_blocks(
+        blocks=blocks_as_dicts,
+        block_operators=block_operators,
+        ipc_codes=clean_ipc_codes,
+        excluded_terms=excluded_terms,
     )
