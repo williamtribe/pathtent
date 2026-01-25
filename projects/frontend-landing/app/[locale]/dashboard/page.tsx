@@ -4,9 +4,25 @@ import type { ReactNode } from "react"
 import { motion } from "motion/react"
 import { Link } from "@/i18n/routing"
 import { useFadeIn } from "@/hooks/use-fade-in"
-import { Search, Network, BarChart3, Cloud, TrendingUp, ArrowRight, Sparkles } from "lucide-react"
+import {
+  FileText,
+  Search,
+  Network,
+  BarChart3,
+  Cloud,
+  TrendingUp,
+  ArrowRight,
+} from "lucide-react"
 
 const features = [
+  {
+    id: "generate",
+    title: "Patent Drafting",
+    description: "AI-powered patent specification drafting from research papers",
+    icon: FileText,
+    href: "/generate",
+    status: "active" as const,
+  },
   {
     id: "formula",
     title: "Search Formula Generator",
@@ -14,7 +30,6 @@ const features = [
     icon: Search,
     href: "/formula",
     status: "active" as const,
-    gradient: "from-blue-500 to-cyan-500",
   },
   {
     id: "sna",
@@ -23,7 +38,6 @@ const features = [
     icon: Network,
     href: "/sna",
     status: "active" as const,
-    gradient: "from-violet-500 to-purple-500",
   },
   {
     id: "lda",
@@ -32,7 +46,6 @@ const features = [
     icon: BarChart3,
     href: "/lda",
     status: "coming-soon" as const,
-    gradient: "from-emerald-500 to-teal-500",
   },
   {
     id: "wordcloud",
@@ -41,7 +54,6 @@ const features = [
     icon: Cloud,
     href: "/wordcloud",
     status: "coming-soon" as const,
-    gradient: "from-orange-500 to-amber-500",
   },
   {
     id: "analytics",
@@ -50,7 +62,6 @@ const features = [
     icon: TrendingUp,
     href: "/analytics",
     status: "coming-soon" as const,
-    gradient: "from-rose-500 to-pink-500",
   },
 ]
 
@@ -107,7 +118,7 @@ function CardContent({ feature, isActive }: { feature: (typeof features)[0]; isA
           : "border-border/50 opacity-70"
       }`}
     >
-      <div className={`absolute top-0 left-0 h-1 w-full bg-gradient-to-r ${feature.gradient}`} />
+      <div className="absolute top-0 left-0 h-1 w-full bg-gradient-to-r from-primary to-blue-400" />
 
       {!isActive && (
         <div className="absolute top-4 right-4">
@@ -117,10 +128,8 @@ function CardContent({ feature, isActive }: { feature: (typeof features)[0]; isA
         </div>
       )}
 
-      <div
-        className={`mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${feature.gradient} shadow-md`}
-      >
-        <Icon className="h-6 w-6 text-white" />
+      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
+        <Icon className="h-6 w-6 text-primary" />
       </div>
 
       <h3 className="text-text mb-2 text-xl font-bold">{feature.title}</h3>
@@ -147,14 +156,6 @@ export default function DashboardPage() {
 
         <div className="relative mx-auto max-w-7xl">
           <FadeInWrapper>
-            <div className="mb-6 flex items-center justify-center gap-3">
-              <div className="from-primary flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br to-blue-600 shadow-lg">
-                <Sparkles className="h-7 w-7 text-white" />
-              </div>
-            </div>
-          </FadeInWrapper>
-
-          <FadeInWrapper delay={100}>
             <h1 className="text-center text-4xl font-bold tracking-tight md:text-5xl lg:text-6xl">
               <span className="text-text">Patent Analysis</span>{" "}
               <span className="bg-gradient-to-r from-rose-500 to-orange-500 bg-clip-text text-transparent">
@@ -163,7 +164,7 @@ export default function DashboardPage() {
             </h1>
           </FadeInWrapper>
 
-          <FadeInWrapper delay={200}>
+          <FadeInWrapper delay={100}>
             <p className="text-text-muted mx-auto mt-6 max-w-2xl text-center text-lg md:text-xl">
               Comprehensive tools for patent research, analysis, and visualization.
               <br className="hidden md:block" />
