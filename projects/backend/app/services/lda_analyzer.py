@@ -1,4 +1,3 @@
-# @TODO-6 — Create LDA topic modeling service with Korean tokenization
 """LDA topic modeling service for patent analysis."""
 
 import asyncio

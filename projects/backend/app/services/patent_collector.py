@@ -1,4 +1,3 @@
-# @TODO-5 — Create patent collection service using KIPRIS free_search API
 """Patent collection service for gathering patents from KIPRIS."""
 
 import asyncio

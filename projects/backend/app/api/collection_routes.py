@@ -1,4 +1,3 @@
-# @TODO-8 — Create patent collection API routes
 """
 API routes for patent data collection from KIPRIS.
 

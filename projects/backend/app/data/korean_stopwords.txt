@@ -1,4 +1,3 @@
-# @TODO-7 — Korean Patent Stopwords data file for LDA analyzer
 # Korean Patent Stopwords
 # Common Korean particles, auxiliary verbs, and patent-specific terms
 # that add noise to topic modeling results

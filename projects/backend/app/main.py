@@ -3,7 +3,6 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# @TODO-10 — Register collection and LDA routers
 from app.api.routes import router as search_router
 from app.api.patent_routes import router as patent_router
 from app.api.collection_routes import router as collection_router
