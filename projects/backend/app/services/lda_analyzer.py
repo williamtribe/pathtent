@@ -3,6 +3,7 @@
 
 import asyncio
 import re
+from pathlib import Path
 
 from gensim import corpora
 from gensim.models import CoherenceModel, LdaModel
@@ -10,45 +11,20 @@ from kiwipiepy import Kiwi
 
 from app.schemas.lda import DocumentTopic, LDARequest, LDAResponse, Topic
 
-# Korean language stopwords for patent text filtering
-# These are common Korean particles, auxiliary verbs, and patent-specific terms
-# that add noise to topic modeling results
-KOREAN_PATENT_STOPWORDS: set[str] = {
-    # Common Korean auxiliary verbs and particles
-    "\uc788\ub2e4",  # "itda" (to exist/have)
-    "\ud558\ub2e4",  # "hada" (to do)
-    "\ub418\ub2e4",  # "doeda" (to become)
-    "\uc774\ub2e4",  # "ida" (to be)
-    "\uac83",  # "geot" (thing)
-    "\uc218",  # "su" (ability/number)
-    "\ub4f1",  # "deung" (etc.)
-    "\ubc0f",  # "mit" (and)
-    "\ub610\ub294",  # "ttoneun" (or)
-    # Patent-specific common terms
-    "\uc0c1\uae30",  # "sanggi" (the above)
-    "\ubcf8",  # "bon" (this/present)
-    "\ubc1c\uba85",  # "balmyeong" (invention)
-    "\ub530\ub978",  # "ttareun" (according to)
-    "\ud1b5\ud574",  # "tonghae" (through)
-    "\uc704\ud574",  # "wihae" (for)
-    "\ub300\ud55c",  # "daehan" (about/regarding)
-    "\uc758\ud55c",  # "uihan" (by means of)
-    "\uad6c\uc131",  # "guseong" (composition)
-    "\ud3ec\ud568",  # "poham" (including)
-    "\uc81c\uacf5",  # "jegong" (providing)
-    "\ubc29\ubc95",  # "bangbeop" (method)
-    "\uc7a5\uce58",  # "jangchi" (device)
-    "\uc2dc\uc2a4\ud15c",  # "siseutem" (system)
-    "\uae30\uc220",  # "gisul" (technology)
-    # Verb endings
-    "\ud558\ub294",  # "haneun" (doing)
-    "\ub418\ub294",  # "doeneun" (becoming)
-    "\uc788\ub294",  # "inneun" (existing)
-    "\uc5c6\ub294",  # "eomneun" (not existing)
-    "\uac19\uc740",  # "gateun" (same)
-    "\ub2e4\ub978",  # "dareun" (different)
-    "\uc774\ub7ec\ud55c",  # "irehan" (such)
-}
+# Path to stopwords file (Korean language stopwords loaded at runtime)
+STOPWORDS_FILE = Path(__file__).parent.parent / "data" / "korean_stopwords.txt"
+
+
+def _load_stopwords() -> set[str]:
+    """Load Korean stopwords from external file."""
+    stopwords: set[str] = set()
+    if STOPWORDS_FILE.exists():
+        with STOPWORDS_FILE.open("r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#"):
+                    stopwords.add(line)
+    return stopwords
 
 
 class LDAAnalyzer:
@@ -62,7 +38,7 @@ class LDAAnalyzer:
     def __init__(self) -> None:
         """Initialize LDA analyzer with Korean tokenizer and semaphore."""
         self._kiwi = Kiwi()
-        self._stopwords = KOREAN_PATENT_STOPWORDS
+        self._stopwords = _load_stopwords()
         self._semaphore = asyncio.Semaphore(
             1
         )  # Single LDA model at a time (CPU-intensive)
