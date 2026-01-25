@@ -116,10 +116,10 @@ class FormulaBuilder:
         if SearchField.ALL not in search_fields:
             keyword_section = cls._add_field_restriction(keyword_section, search_fields)
 
-        # Add exclusions
+        # Add exclusions (KIPRIS requires AND NOT: *!)
         if excluded_terms:
             exclusion_section = cls._build_exclusion_section(excluded_terms)
-            formula = f"({keyword_section}){cls.NOT}{exclusion_section}"
+            formula = f"({keyword_section}){cls.AND}{cls.NOT}{exclusion_section}"
         else:
             formula = keyword_section
 
@@ -280,9 +280,9 @@ class FormulaAdjuster:
 
     @staticmethod
     def add_exclusions(formula: str, terms: list[str]) -> str:
-        """Add NOT exclusions to existing formula."""
+        """Add NOT exclusions to existing formula (KIPRIS requires AND NOT: *!)."""
         exclusion = FormulaBuilder._build_exclusion_section(terms)
-        return f"({formula}){FormulaBuilder.NOT}{exclusion}"
+        return f"({formula}){FormulaBuilder.AND}{FormulaBuilder.NOT}{exclusion}"
 
     @staticmethod
     def add_synonyms_to_group(

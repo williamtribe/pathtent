@@ -1,21 +1,20 @@
 #!/usr/bin/env python3
 """
-Build IPC embeddings database using Gemini.
+Build IPC embeddings database using Gemini (BATCH mode).
 
-Embeds Korean IPC descriptions for semantic search.
-Concurrent + robust:
-- ~30-40 req/sec
-- Retry on network errors
-- Checkpoint every 500
-- Auto-resume
+- 100 items per batch
+- 40 req/sec rate limit
+- Checkpoint every 10 batches
+- Graceful Ctrl+C handling
 
 Usage:
-    python scripts/build_ipc_embeddings.py
+    uv run python scripts/build_ipc_embeddings.py
 """
 
-import asyncio
 import json
 import os
+import signal
+import sys
 import time
 from pathlib import Path
 
@@ -25,69 +24,25 @@ from google import genai
 
 load_dotenv(Path(__file__).parent.parent / ".env")
 
-EMBEDDING_MODEL = "models/embedding-001"
-MAX_CONCURRENT = 30
-REQUESTS_PER_SECOND = 45
-CHECKPOINT_INTERVAL = 500
-MAX_RETRIES = 3
-RETRY_DELAY = 5
+EMBEDDING_MODEL = os.environ.get("GEMINI_EMBEDDING_MODEL", "gemini-embedding-001")
+BATCH_SIZE = 100  # Gemini max
+RATE_LIMIT = 40  # req/sec
+CHECKPOINT_INTERVAL = 10  # batches
+
+# Global for signal handler
+_checkpoint_data = {"embeddings": [], "codes": [], "path": None}
+_interrupted = False
 
 
-class RateLimiter:
-    def __init__(self, rate: float):
-        self.rate = rate
-        self.last_time = time.monotonic()
-        self.lock = asyncio.Lock()
-
-    async def acquire(self):
-        async with self.lock:
-            now = time.monotonic()
-            min_interval = 1.0 / self.rate
-            elapsed = now - self.last_time
-            if elapsed < min_interval:
-                await asyncio.sleep(min_interval - elapsed)
-            self.last_time = time.monotonic()
+def _signal_handler(signum, frame):
+    global _interrupted
+    print("\n\nInterrupted! Saving checkpoint...")
+    _interrupted = True
 
 
-async def embed_single(
-    client: genai.Client,
-    idx: int,
-    text: str,
-    semaphore: asyncio.Semaphore,
-    rate_limiter: RateLimiter,
-) -> tuple[int, list[float]]:
-    """Embed with retry."""
-    await rate_limiter.acquire()
-    async with semaphore:
-        last_error: Exception | None = None
-        for attempt in range(MAX_RETRIES):
-            try:
+def main():
+    global _checkpoint_data
 
-                def _embed():
-                    result = client.models.embed_content(
-                        model=EMBEDDING_MODEL, contents=text
-                    )
-                    if result.embeddings and result.embeddings[0].values:
-                        return list(result.embeddings[0].values)
-                    raise ValueError("Empty embedding")
-
-                return idx, await asyncio.to_thread(_embed)
-            except Exception as e:
-                last_error = e
-                if attempt < MAX_RETRIES - 1:
-                    await asyncio.sleep(RETRY_DELAY * (attempt + 1))
-        raise last_error or ValueError("Failed")
-
-
-def save_checkpoint(path: str, embeddings: list, codes: list):
-    np.savez(
-        path,
-        embeddings=np.array(embeddings, dtype=np.float32),
-        codes=np.array(codes[: len(embeddings)], dtype=object),
-    )
-
-
-async def main():
     api_key = os.environ.get("GOOGLE_API_KEY")
     if not api_key:
         print("Error: GOOGLE_API_KEY not set")
@@ -99,6 +54,8 @@ async def main():
     output_path = data_dir / "ipc_embeddings.npz"
     checkpoint_path = data_dir / "ipc_embeddings_checkpoint.npz"
 
+    _checkpoint_data["path"] = checkpoint_path
+
     # Load IPC codes
     print(f"Loading {ipc_json_path}...")
     with open(ipc_json_path, encoding="utf-8") as f:
@@ -107,6 +64,7 @@ async def main():
     codes = list(ipc_data.keys())
     descriptions = [ipc_data[code]["description"] for code in codes]
     total = len(codes)
+    _checkpoint_data["codes"] = codes
 
     # Check checkpoint
     embeddings: list[list[float]] = []
@@ -121,79 +79,122 @@ async def main():
 
     if start_idx >= total:
         print("Already complete!")
-        np.savez(
-            output_path,
-            embeddings=np.array(embeddings, dtype=np.float32),
-            codes=np.array(codes, dtype=object),
-        )
+        _save_final(output_path, embeddings, codes)
         if checkpoint_path.exists():
             checkpoint_path.unlink()
         return
 
+    _checkpoint_data["embeddings"] = embeddings
+
     remaining = total - start_idx
+    num_batches = (remaining + BATCH_SIZE - 1) // BATCH_SIZE
+    print(f"Model: {EMBEDDING_MODEL}")
     print(f"Total: {total}, Remaining: {remaining}")
-    print(f"Rate: {REQUESTS_PER_SECOND}/sec, Concurrent: {MAX_CONCURRENT}")
+    print(f"Batches: {num_batches} x {BATCH_SIZE} items")
+    print(f"Rate: {RATE_LIMIT}/sec, ETA: ~{num_batches / RATE_LIMIT:.1f}s (optimistic)")
     print()
 
+    # Setup signal handler
+    signal.signal(signal.SIGINT, _signal_handler)
+
     client = genai.Client(api_key=api_key)
-    semaphore = asyncio.Semaphore(MAX_CONCURRENT)
-    rate_limiter = RateLimiter(REQUESTS_PER_SECOND)
-
+    interval = 1.0 / RATE_LIMIT
     start_time = time.time()
-    completed = 0
-    results_buffer: list[tuple[int, list[float]]] = []
+    batch_count = 0
 
-    async def process_with_progress(idx: int, text: str):
-        nonlocal completed
-        result = await embed_single(client, idx, text, semaphore, rate_limiter)
-        completed += 1
-        if completed % 100 == 0:
-            elapsed = time.time() - start_time
-            rate = completed / elapsed if elapsed > 0 else 0
-            eta = (remaining - completed) / rate if rate > 0 else 0
+    for batch_start in range(start_idx, total, BATCH_SIZE):
+        if _interrupted:
+            break
+
+        batch_end = min(batch_start + BATCH_SIZE, total)
+        batch_texts = descriptions[batch_start:batch_end]
+
+        # Rate limiting
+        time.sleep(interval)
+
+        # Batch embed
+        try:
+            batch_embs = _embed_batch_sync(client, batch_texts)
+        except Exception as e:
+            print(f"\n\nFATAL: Failed at batch {batch_start}-{batch_end}: {e}")
+            print(f"Saving checkpoint at {len(embeddings)}...")
+            _save_checkpoint(checkpoint_path, embeddings, codes)
+            raise
+
+        # Validate batch size
+        if len(batch_embs) != len(batch_texts):
             print(
-                f"  Progress: {start_idx + completed}/{total} ({(start_idx + completed) / total * 100:.1f}%) - {rate:.1f}/sec - ETA: {eta:.0f}s"
+                f"\n\nFATAL: Batch size mismatch: {len(batch_embs)} vs {len(batch_texts)}"
             )
-        return result
+            _save_checkpoint(checkpoint_path, embeddings, codes)
+            raise ValueError("Batch size mismatch")
 
-    # Process in chunks for checkpointing
-    chunk_size = CHECKPOINT_INTERVAL
+        embeddings.extend(batch_embs)
+        _checkpoint_data["embeddings"] = embeddings
+        batch_count += 1
 
-    try:
-        for chunk_start in range(start_idx, total, chunk_size):
-            chunk_end = min(chunk_start + chunk_size, total)
-            chunk_indices = range(chunk_start, chunk_end)
+        # Progress
+        elapsed = time.time() - start_time
+        rate = batch_count / elapsed if elapsed > 0 else 0
+        eta = (num_batches - batch_count) / rate if rate > 0 else 0
+        pct = len(embeddings) / total * 100
+        print(
+            f"  {len(embeddings)}/{total} ({pct:.1f}%) - {rate:.2f} batch/sec - ETA: {eta:.0f}s"
+        )
 
-            tasks = [process_with_progress(i, descriptions[i]) for i in chunk_indices]
-            chunk_results = await asyncio.gather(*tasks)
+        # Checkpoint
+        if batch_count % CHECKPOINT_INTERVAL == 0:
+            print(f"  [Checkpoint at {len(embeddings)}]")
+            _save_checkpoint(checkpoint_path, embeddings, codes)
 
-            # Sort by index and add to embeddings
-            chunk_results_sorted = sorted(chunk_results, key=lambda x: x[0])
-            for idx, emb in chunk_results_sorted:
-                # Ensure we're adding in order
-                while len(embeddings) < idx:
-                    embeddings.append([0.0] * 768)  # placeholder (shouldn't happen)
-                if len(embeddings) == idx:
-                    embeddings.append(emb)
-                else:
-                    embeddings[idx] = emb
-
-            # Save checkpoint
-            print(f"  Checkpoint at {len(embeddings)}...")
-            save_checkpoint(str(checkpoint_path), embeddings, codes)
-
-    except KeyboardInterrupt:
-        print(f"\n\nInterrupted! Checkpoint saved at {len(embeddings)}")
-        return
-    except Exception as e:
-        print(f"\n\nError: {e}")
-        print(f"Checkpoint saved at {len(embeddings)}")
-        raise
+    # Final save
+    if _interrupted:
+        print(f"Saving checkpoint at {len(embeddings)}...")
+        _save_checkpoint(checkpoint_path, embeddings, codes)
+        print("Exiting. Run again to resume.")
+        sys.exit(0)
 
     # Done
     elapsed = time.time() - start_time
-    print(f"\nCompleted in {elapsed:.1f}s ({remaining / elapsed:.1f}/sec)")
+    print(f"\nCompleted in {elapsed:.1f}s ({batch_count / elapsed:.2f} batch/sec)")
 
+    _save_final(output_path, embeddings, codes)
+
+    if checkpoint_path.exists():
+        checkpoint_path.unlink()
+        print("Removed checkpoint")
+
+
+def _embed_batch_sync(client: genai.Client, texts: list[str]) -> list[list[float]]:
+    """Synchronous batch embedding. Raises on any error."""
+    result = client.models.embed_content(model=EMBEDDING_MODEL, contents=texts)
+
+    if not result.embeddings:
+        raise ValueError(f"Empty embeddings for batch of {len(texts)}")
+
+    if len(result.embeddings) != len(texts):
+        raise ValueError(
+            f"Embedding count mismatch: {len(result.embeddings)} vs {len(texts)}"
+        )
+
+    embeddings = []
+    for i, emb in enumerate(result.embeddings):
+        if not emb.values:
+            raise ValueError(f"Empty embedding at index {i}")
+        embeddings.append(list(emb.values))
+
+    return embeddings
+
+
+def _save_checkpoint(path: Path, embeddings: list, codes: list):
+    np.savez(
+        str(path),
+        embeddings=np.array(embeddings, dtype=np.float32),
+        codes=np.array(codes[: len(embeddings)], dtype=object),
+    )
+
+
+def _save_final(output_path: Path, embeddings: list, codes: list):
     embeddings_array = np.array(embeddings, dtype=np.float32)
     codes_array = np.array(codes, dtype=object)
 
@@ -206,10 +207,6 @@ async def main():
         json.dump({code: idx for idx, code in enumerate(codes)}, f)
     print(f"Saved: {mapping_path}")
 
-    if checkpoint_path.exists():
-        checkpoint_path.unlink()
-        print("Removed checkpoint")
-
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

@@ -6,7 +6,6 @@ from pathlib import Path
 
 from gensim import corpora
 from gensim.models import CoherenceModel, LdaModel
-from kiwipiepy import Kiwi
 
 from app.schemas.lda import DocumentTopic, LDARequest, LDAResponse, Topic
 
@@ -30,13 +29,14 @@ class LDAAnalyzer:
     """
     LDA topic modeling service for Korean patent texts.
 
-    Uses kiwipiepy for Korean morphological analysis and gensim for LDA.
+    Uses regex-based tokenization (temporary) and gensim for LDA.
     Supports automatic topic number selection via coherence optimization.
+
+    TODO: Replace with KorPatBERT tokenizer for better quality.
     """
 
     def __init__(self) -> None:
-        """Initialize LDA analyzer with Korean tokenizer and semaphore."""
-        self._kiwi = Kiwi()
+        """Initialize LDA analyzer with stopwords and semaphore."""
         self._stopwords = _load_stopwords()
         self._semaphore = asyncio.Semaphore(
             1
@@ -44,31 +44,24 @@ class LDAAnalyzer:
 
     def _tokenize(self, text: str) -> list[str]:
         """
-        Tokenize Korean text using kiwipiepy.
+        Tokenize Korean text using regex (temporary solution).
 
-        Extracts nouns and verbs, filters stopwords and short tokens.
+        Extracts Korean words with 2+ characters, filters stopwords.
+
+        TODO: Replace with KorPatBERT/MeCab for proper morphological analysis.
 
         Args:
             text: Korean text to tokenize
 
         Returns:
-            List of tokens (morphemes)
+            List of tokens
         """
-        # Remove special characters but keep Korean/English/numbers
-        text = re.sub(r"[^\w\s가-힣a-zA-Z0-9]", " ", text)
+        # Extract Korean words (2+ chars) and English words
+        korean_tokens = re.findall(r"[가-힣]{2,}", text)
+        english_tokens = re.findall(r"[a-zA-Z]{3,}", text.lower())
 
-        tokens: list[str] = []
-        result = self._kiwi.tokenize(text)
-
-        for token in result:
-            word = token.form
-            tag = token.tag
-
-            # Extract nouns (NN*) and verb stems (VV)
-            if tag.startswith("NN") or tag.startswith("VV"):
-                # Filter stopwords and short tokens
-                if word not in self._stopwords and len(word) > 1:
-                    tokens.append(word)
+        # Filter stopwords
+        tokens = [t for t in korean_tokens + english_tokens if t not in self._stopwords]
 
         return tokens
 

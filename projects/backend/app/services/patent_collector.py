@@ -43,7 +43,7 @@ class PatentCollector:
         patents: list[PatentItem] = []
         total_count = 0
         docs_start = 1
-        page_size = 30  # KIPRIS free_search max per page
+        page_size = 500  # KIPRIS free_search max per page
 
         async with KIPRISClient(self._service_key) as client:
             while len(patents) < request.max_results:
