@@ -21,7 +21,7 @@ class LDARequest(BaseModel):
         description="Minimum document frequency for term inclusion",
     )
     max_df: float = Field(
-        default=0.5,
+        default=0.4,
         gt=0.0,
         le=1.0,
         description="Maximum document frequency ratio for term exclusion (filters common words)",

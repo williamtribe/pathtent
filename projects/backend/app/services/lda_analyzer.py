@@ -21,10 +21,41 @@ from app.schemas.lda import (
 # Path to stopwords file (Korean language stopwords loaded at runtime)
 STOPWORDS_FILE = Path(__file__).parent.parent / "data" / "korean_stopwords.txt"
 
+# Minimal patent-specific stopwords (common function words in patent claims)
+# TODO: Remove when KorPatBERT + MeCab morphological analysis is implemented
+PATENT_STOPWORDS = {
+    "포함하는",
+    "이용한",
+    "위한",
+    "관한",
+    "의한",
+    "통한",
+    "따른",
+    "구비하는",
+    "형성된",
+    "구성된",
+    "제공하는",
+    "갖는",
+    "가지는",
+    "이루어진",
+    "되어있는",
+    "있는",
+    "없는",
+    "하는",
+    "되는",
+    "복수의",
+    "하나의",
+    "상기",
+    "본",
+    "그",
+    "이",
+    "저",
+}
+
 
 def _load_stopwords() -> set[str]:
-    """Load Korean stopwords from external file."""
-    stopwords: set[str] = set()
+    """Load Korean stopwords from external file + patent-specific stopwords."""
+    stopwords: set[str] = set(PATENT_STOPWORDS)
     if STOPWORDS_FILE.exists():
         with STOPWORDS_FILE.open("r", encoding="utf-8") as f:
             for line in f:
