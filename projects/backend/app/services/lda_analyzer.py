@@ -3,10 +3,7 @@
 import asyncio
 import re
 from pathlib import Path
-from typing import Any
 
-import pyLDAvis
-import pyLDAvis.gensim_models
 from gensim import corpora
 from gensim.models import CoherenceModel, LdaModel
 
@@ -257,105 +254,6 @@ class LDAAnalyzer:
                 vocabulary_size=len(dictionary),
             )
 
-    async def analyze_with_viz(self, request: LDARequest) -> tuple[LDAResponse, str]:
-        """
-        Perform LDA analysis and generate pyLDAvis HTML visualization.
-
-        Args:
-            request: LDA request with patents and parameters
-
-        Returns:
-            Tuple of (LDAResponse, pyLDAvis HTML string)
-        """
-        async with self._semaphore:
-            # Prepare corpus
-            tokenized_docs, dictionary, corpus = self._prepare_corpus(
-                request.patents,
-                min_df=request.min_df,
-                max_df=request.max_df,
-            )
-
-            if len(dictionary) == 0 or all(len(doc) == 0 for doc in corpus):
-                raise ValueError(
-                    "Corpus is empty after preprocessing. "
-                    "Try lowering min_df or providing more documents."
-                )
-
-            # Determine number of topics
-            if request.num_topics == "auto":
-                num_topics = self._find_optimal_topics(
-                    tokenized_docs, dictionary, corpus
-                )
-            else:
-                num_topics = int(request.num_topics)
-                num_topics = max(2, min(50, num_topics))
-
-            # Train LDA model
-            model = LdaModel(
-                corpus=corpus,
-                id2word=dictionary,
-                num_topics=num_topics,
-                random_state=42,
-                passes=10,
-                alpha="auto",
-                eta="auto",
-            )
-
-            # Calculate coherence
-            coherence_model = CoherenceModel(
-                model=model,
-                texts=tokenized_docs,
-                dictionary=dictionary,
-                coherence="c_v",
-            )
-            coherence_score = coherence_model.get_coherence()
-
-            # Extract topics
-            topics: list[Topic] = []
-            for topic_id in range(num_topics):
-                topic_terms = model.show_topic(topic_id, topn=10)
-                keywords = [word for word, _ in topic_terms]
-                weight = sum(prob for _, prob in topic_terms)
-                topics.append(Topic(id=topic_id, keywords=keywords, weight=weight))
-
-            # Assign documents to topics
-            documents: list[DocumentTopic] = []
-            for i, (doc, bow) in enumerate(zip(request.patents, corpus)):
-                topic_dist = model.get_document_topics(bow, minimum_probability=0.0)
-                topic_probs = [0.0] * num_topics
-                for tid, prob in topic_dist:
-                    topic_probs[tid] = prob
-
-                dominant_topic = max(
-                    range(len(topic_probs)), key=lambda x: topic_probs[x]
-                )
-                dominant_prob = topic_probs[dominant_topic]
-
-                documents.append(
-                    DocumentTopic(
-                        patent_id=doc["id"],
-                        topic_id=dominant_topic,
-                        probability=dominant_prob,
-                        topic_distribution=topic_probs,
-                    )
-                )
-
-            # Generate pyLDAvis visualization
-            vis_data = pyLDAvis.gensim_models.prepare(
-                model, corpus, dictionary, sort_topics=False
-            )
-            vis_html = pyLDAvis.prepared_data_to_html(vis_data)
-
-            response = LDAResponse(
-                topics=topics,
-                documents=documents,
-                coherence_score=coherence_score,
-                num_topics=num_topics,
-                vocabulary_size=len(dictionary),
-            )
-
-            return response, vis_html
-
 
 async def analyze_lda(request: LDARequest) -> LDAResponse:
     """
@@ -369,17 +267,3 @@ async def analyze_lda(request: LDARequest) -> LDAResponse:
     """
     analyzer = LDAAnalyzer()
     return await analyzer.analyze(request)
-
-
-async def analyze_lda_with_viz(request: LDARequest) -> tuple[LDAResponse, str]:
-    """
-    Convenience function for LDA analysis with pyLDAvis visualization.
-
-    Args:
-        request: LDA request with patents and parameters
-
-    Returns:
-        Tuple of (LDAResponse, pyLDAvis HTML string)
-    """
-    analyzer = LDAAnalyzer()
-    return await analyzer.analyze_with_viz(request)

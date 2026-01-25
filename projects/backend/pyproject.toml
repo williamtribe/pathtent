@@ -30,7 +30,6 @@ dependencies = [
     "numpy>=2.0.0",
     "kiwipiepy>=0.21.0",
     "eunjeon>=0.4.0",
-    "pyldavis>=3.4.0",
 ]
 
 [dependency-groups]

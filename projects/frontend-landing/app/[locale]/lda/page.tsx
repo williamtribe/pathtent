@@ -7,19 +7,16 @@ import {
   Search,
   Loader2,
   Layers,
-  Info,
   FileText,
   BarChart3,
-  ExternalLink,
 } from "lucide-react"
 import {
   collectPatents,
   analyzeLDA,
-  openLDAVisualization,
   type CollectResponse,
   type LDAResponse,
-  type Topic,
 } from "../../../lib/api"
+import { LDAVisualization } from "../../../components/lda-visualization"
 
 export default function LDAPage() {
   const [formula, setFormula] = useState("")
@@ -27,11 +24,10 @@ export default function LDAPage() {
   const [numTopics, setNumTopics] = useState<number | "auto">("auto")
   const [isCollecting, setIsCollecting] = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
-  const [isLoadingViz, setIsLoadingViz] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [collectResult, setCollectResult] = useState<CollectResponse | null>(null)
   const [ldaResult, setLdaResult] = useState<LDAResponse | null>(null)
-  const [selectedTopic, setSelectedTopic] = useState<Topic | null>(null)
+  const [showVisualization, setShowVisualization] = useState(false)
 
   const handleCollect = async () => {
     if (!formula.trim()) {
@@ -43,7 +39,7 @@ export default function LDAPage() {
     setError(null)
     setCollectResult(null)
     setLdaResult(null)
-    setSelectedTopic(null)
+    setShowVisualization(false)
 
     try {
       const data = await collectPatents({
@@ -67,7 +63,7 @@ export default function LDAPage() {
     setIsAnalyzing(true)
     setError(null)
     setLdaResult(null)
-    setSelectedTopic(null)
+    setShowVisualization(false)
 
     try {
       const patents = collectResult.patents.map((p) => ({
@@ -80,50 +76,11 @@ export default function LDAPage() {
         num_topics: numTopics,
       })
       setLdaResult(data)
-      if (data.topics.length > 0 && data.topics[0]) {
-        setSelectedTopic(data.topics[0])
-      }
+      setShowVisualization(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : "LDA analysis failed.")
     } finally {
       setIsAnalyzing(false)
-    }
-  }
-
-  const getTopicPatents = (topicId: number) => {
-    if (!ldaResult || !collectResult) return []
-    return ldaResult.documents
-      .filter((d) => d.topic_id === topicId)
-      .sort((a, b) => b.probability - a.probability)
-      .slice(0, 10)
-      .map((d) => {
-        const patent = collectResult.patents.find(
-          (p) => p.application_number === d.patent_id,
-        )
-        return { ...d, patent }
-      })
-  }
-
-  const handleOpenVisualization = async () => {
-    if (!collectResult) return
-
-    setIsLoadingViz(true)
-    setError(null)
-
-    try {
-      const patents = collectResult.patents.map((p) => ({
-        id: p.application_number,
-        text: `${p.title} ${p.abstract || ""}`,
-      }))
-
-      await openLDAVisualization({
-        patents,
-        num_topics: numTopics,
-      })
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load visualization.")
-    } finally {
-      setIsLoadingViz(false)
     }
   }
 
@@ -246,7 +203,7 @@ export default function LDAPage() {
 
               <button
                 onClick={handleAnalyze}
-                disabled={isAnalyzing || isCollecting || isLoadingViz}
+                disabled={isAnalyzing || isCollecting}
                 className="flex items-center gap-2 rounded-lg bg-primary px-6 py-3 font-semibold text-white transition-all hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isAnalyzing ? (
@@ -261,26 +218,6 @@ export default function LDAPage() {
                   </>
                 )}
               </button>
-
-              {ldaResult && (
-                <button
-                  onClick={handleOpenVisualization}
-                  disabled={isLoadingViz || isAnalyzing}
-                  className="flex items-center gap-2 rounded-lg border border-primary bg-white px-6 py-3 font-semibold text-primary transition-all hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {isLoadingViz ? (
-                    <>
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                      Loading...
-                    </>
-                  ) : (
-                    <>
-                      <ExternalLink className="h-5 w-5" />
-                      Open Visualization
-                    </>
-                  )}
-                </button>
-              )}
             </div>
           </motion.div>
         )}
@@ -291,117 +228,16 @@ export default function LDAPage() {
           </div>
         )}
 
-        {/* Results */}
-        {ldaResult && (
+        {/* Results - New Visualization Component */}
+        {ldaResult && collectResult && showVisualization && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="grid grid-cols-1 gap-6 lg:grid-cols-4"
           >
-            {/* Topics List */}
-            <div className="space-y-4">
-              <div className="rounded-lg border border-border bg-white p-4">
-                <h3 className="mb-3 flex items-center gap-2 font-semibold">
-                  <Info className="h-5 w-5 text-primary" />
-                  Analysis Results
-                </h3>
-                <dl className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <dt className="text-text-muted">Topics</dt>
-                    <dd className="font-medium">{ldaResult.num_topics}</dd>
-                  </div>
-                  <div className="flex justify-between">
-                    <dt className="text-text-muted">Vocabulary</dt>
-                    <dd className="font-medium">{ldaResult.vocabulary_size}</dd>
-                  </div>
-                  <div className="flex justify-between">
-                    <dt className="text-text-muted">Coherence</dt>
-                    <dd className="font-medium">
-                      {ldaResult.coherence_score.toFixed(3)}
-                    </dd>
-                  </div>
-                </dl>
-              </div>
-
-              <div className="rounded-lg border border-border bg-white p-4">
-                <h3 className="mb-3 font-semibold">Topics</h3>
-                <ul className="space-y-2 text-sm">
-                  {ldaResult.topics.map((topic) => (
-                    <li
-                      key={topic.id}
-                      onClick={() => setSelectedTopic(topic)}
-                      className={`cursor-pointer rounded p-3 transition-colors ${
-                        selectedTopic?.id === topic.id
-                          ? "border border-primary bg-primary/5"
-                          : "hover:bg-surface"
-                      }`}
-                    >
-                      <div className="mb-1 font-medium">Topic {topic.id + 1}</div>
-                      <div className="text-xs text-text-muted">
-                        {topic.keywords.slice(0, 5).join(", ")}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-
-            {/* Topic Details */}
-            <div className="lg:col-span-3 space-y-4">
-              {selectedTopic && (
-                <>
-                  <div className="rounded-lg border border-border bg-white p-6">
-                    <h3 className="mb-4 text-lg font-semibold">
-                      Topic {selectedTopic.id + 1} Keywords
-                    </h3>
-                    <div className="flex flex-wrap gap-2">
-                      {selectedTopic.keywords.map((keyword, idx) => (
-                        <span
-                          key={idx}
-                          className="rounded-full bg-primary/10 px-4 py-2 text-sm font-medium text-primary"
-                          style={{
-                            opacity: 1 - idx * 0.08,
-                          }}
-                        >
-                          {keyword}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="rounded-lg border border-border bg-white p-6">
-                    <h3 className="mb-4 text-lg font-semibold">
-                      Top Patents in Topic {selectedTopic.id + 1}
-                    </h3>
-                    <div className="space-y-3">
-                      {getTopicPatents(selectedTopic.id).map((item) => (
-                        <div
-                          key={item.patent_id}
-                          className="rounded-lg border border-border p-4"
-                        >
-                          <div className="mb-1 flex items-center justify-between">
-                            <span className="font-mono text-sm text-text-muted">
-                              {item.patent_id}
-                            </span>
-                            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-                              {(item.probability * 100).toFixed(1)}%
-                            </span>
-                          </div>
-                          <div className="font-medium">
-                            {item.patent?.title || "Title not available"}
-                          </div>
-                          {item.patent?.applicant && (
-                            <div className="mt-1 text-sm text-text-muted">
-                              {item.patent.applicant}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
+            <LDAVisualization
+              ldaResult={ldaResult}
+              collectResult={collectResult}
+            />
           </motion.div>
         )}
 
