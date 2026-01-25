@@ -39,13 +39,14 @@ const features = [
     href: "/sna",
     status: "active" as const,
   },
+  // @TODO-13 — Change LDA status to active
   {
     id: "lda",
     title: "LDA Clustering",
     description: "Topic modeling and document clustering using LDA algorithm",
     icon: BarChart3,
     href: "/lda",
-    status: "coming-soon" as const,
+    status: "active" as const,
   },
   {
     id: "wordcloud",
