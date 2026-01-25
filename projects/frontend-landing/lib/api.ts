@@ -2,7 +2,7 @@
  * Patent Specification Generator API Client
  */
 
-// 백엔드 없이 프론트엔드 UI 테스트용 모킹 모드
+// Mock mode for frontend UI testing without backend
 const MOCK_MODE = false
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
@@ -177,7 +177,7 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
 const mockAnalyzeDocument = async (text: string): Promise<AnalyzeResponse> => {
   console.log('🎭 [MOCK] Analyzing document:', text.substring(0, 100) + '...')
-  await delay(2000) // 2초 딜레이로 로딩 표시
+  await delay(2000) // 2 second delay for loading display
 
   return {
     session_id: `mock-session-${Date.now()}`,
@@ -387,6 +387,165 @@ export async function improveFormula(
 }
 
 // ============================================================================
+// Collection Types
+// ============================================================================
+
+// @TODO-11 — Add collection and LDA API functions
+export interface CollectRequest {
+  formula: string
+  max_results?: number
+}
+
+export interface PatentItem {
+  application_number: string
+  title: string
+  abstract: string | null
+  ipc_codes: string[]
+  applicant: string | null
+  application_date: string | null
+  publication_number: string | null
+  register_number: string | null
+}
+
+export interface CollectResponse {
+  patents: PatentItem[]
+  total: number
+  collected: number
+  formula: string
+}
+
+// ============================================================================
+// LDA Types
+// ============================================================================
+
+export interface LDARequest {
+  patents: { id: string; text: string }[]
+  num_topics?: number | 'auto'
+  min_df?: number
+  max_df?: number
+}
+
+export interface Topic {
+  id: number
+  keywords: string[]
+  weight: number
+}
+
+export interface DocumentTopic {
+  patent_id: string
+  topic_id: number
+  probability: number
+  topic_distribution: number[]
+}
+
+export interface LDAResponse {
+  topics: Topic[]
+  documents: DocumentTopic[]
+  coherence_score: number
+  num_topics: number
+  vocabulary_size: number
+}
+
+// ============================================================================
+// Collection API
+// ============================================================================
+
+const mockCollectPatents = async (request: CollectRequest): Promise<CollectResponse> => {
+  console.log('[MOCK] Collecting patents:', request.formula)
+  await delay(2000)
+  const mockPatents: PatentItem[] = Array.from({ length: Math.min(request.max_results || 100, 20) }, (_, i) => ({
+    application_number: `1020240${String(i + 1).padStart(6, '0')}`,
+    title: `Mock Patent ${i + 1}: ${request.formula} Technology`,
+    abstract: `This invention relates to ${request.formula} with improved efficiency and performance.`,
+    ipc_codes: ['G06F', 'H04L'],
+    applicant: 'Mock Company Inc.',
+    application_date: '2024-01-15',
+    publication_number: null,
+    register_number: null,
+  }))
+  return {
+    patents: mockPatents,
+    total: 100,
+    collected: mockPatents.length,
+    formula: request.formula,
+  }
+}
+
+/**
+ * Collect patents from KIPRIS using a search formula
+ */
+export async function collectPatents(request: CollectRequest): Promise<CollectResponse> {
+  if (MOCK_MODE) {
+    return mockCollectPatents(request)
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/v1/patent/collect`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(request),
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Unknown error' }))
+    throw new Error(error.detail || `HTTP ${response.status}`)
+  }
+
+  return response.json()
+}
+
+// ============================================================================
+// LDA API
+// ============================================================================
+
+const mockAnalyzeLDA = async (request: LDARequest): Promise<LDAResponse> => {
+  console.log('[MOCK] Analyzing LDA:', request.patents.length, 'documents')
+  await delay(3000)
+  const numTopics = request.num_topics === 'auto' ? 5 : request.num_topics || 5
+  return {
+    topics: Array.from({ length: numTopics }, (_, i) => ({
+      id: i,
+      keywords: [`keyword${i + 1}a`, `keyword${i + 1}b`, `keyword${i + 1}c`, `keyword${i + 1}d`, `keyword${i + 1}e`],
+      weight: 0.2 - i * 0.02,
+    })),
+    documents: request.patents.map((p, i) => ({
+      patent_id: p.id,
+      topic_id: i % numTopics,
+      probability: 0.7 + Math.random() * 0.3,
+      topic_distribution: Array.from({ length: numTopics }, () => Math.random()),
+    })),
+    coherence_score: 0.45,
+    num_topics: numTopics,
+    vocabulary_size: 1500,
+  }
+}
+
+/**
+ * Perform LDA topic modeling on patent texts
+ */
+export async function analyzeLDA(request: LDARequest): Promise<LDAResponse> {
+  if (MOCK_MODE) {
+    return mockAnalyzeLDA(request)
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/v1/analysis/lda`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(request),
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Unknown error' }))
+    throw new Error(error.detail || `HTTP ${response.status}`)
+  }
+
+  return response.json()
+}
+
+// ============================================================================
 // SNA Types
 // ============================================================================
 
@@ -463,7 +622,7 @@ export async function analyzeSNA(params: SNAParams): Promise<SNAResult> {
 export async function downloadPatentWord(sessionId: string, title: string): Promise<void> {
   if (MOCK_MODE) {
     console.log('🎭 [MOCK] Downloading Word document for session:', sessionId)
-    alert('MOCK 모드: 실제 백엔드 연결 시 Word 파일이 다운로드됩니다.')
+    alert('MOCK mode: Word file will be downloaded when connected to actual backend.')
     return
   }
 
