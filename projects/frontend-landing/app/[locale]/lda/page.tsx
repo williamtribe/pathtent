@@ -131,10 +131,10 @@ export default function LDAPage() {
                 type="number"
                 value={maxResults}
                 onChange={(e) =>
-                  setMaxResults(Math.min(500, Math.max(10, Number(e.target.value))))
+                  setMaxResults(Math.min(5000, Math.max(10, Number(e.target.value))))
                 }
                 min={10}
-                max={500}
+                max={5000}
                 className="w-full rounded-lg border border-border p-3 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
               />
             </div>
