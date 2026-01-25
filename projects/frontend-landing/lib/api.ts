@@ -433,6 +433,7 @@ export interface TopicCoordinate {
 export interface Topic {
   id: number
   keywords: string[]
+  keyword_weights?: number[]
   weight: number
   coordinate?: TopicCoordinate | null
   label?: string

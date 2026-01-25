@@ -249,10 +249,11 @@ class LDAAnalyzer:
             # Extract topics with keywords, coordinates, and labels
             topics: list[Topic] = []
             for topic_id in range(num_topics):
-                # Get top 10 words for this topic
+                # Get top 10 words for this topic with their probabilities
                 topic_terms = model.show_topic(topic_id, topn=10)
                 keywords = [word for word, _ in topic_terms]
-                weight = sum(prob for _, prob in topic_terms)
+                keyword_weights = [float(prob) for _, prob in topic_terms]
+                weight = sum(keyword_weights)
 
                 # Create coordinate from MDS projection (preserves JS divergence distances)
                 coord = TopicCoordinate(
@@ -267,6 +268,7 @@ class LDAAnalyzer:
                     Topic(
                         id=topic_id,
                         keywords=keywords,
+                        keyword_weights=keyword_weights,
                         weight=weight,
                         coordinate=coord,
                         label=label,

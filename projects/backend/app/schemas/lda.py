@@ -46,6 +46,10 @@ class Topic(BaseModel):
         ...,
         description="Top keywords representing this topic",
     )
+    keyword_weights: list[float] = Field(
+        default_factory=list,
+        description="Weight/probability for each keyword (same order as keywords)",
+    )
     weight: float = Field(
         ...,
         description="Topic weight/importance in the corpus",

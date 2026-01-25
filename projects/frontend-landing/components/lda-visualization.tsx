@@ -90,14 +90,15 @@ export function LDAVisualization({
     return topicData.find((t) => t.id === selectedTopicId)
   }, [selectedTopicId, topicData])
 
-  // Keywords bar chart data
+  // Keywords bar chart data with real LDA weights
   const keywordData = useMemo(() => {
     if (!selectedTopic) return []
     const topic = ldaResult.topics.find((t) => t.id === selectedTopic.id)
     if (!topic) return []
+    const weights = topic.keyword_weights || []
     return topic.keywords.slice(0, 10).map((kw, idx) => ({
       keyword: kw,
-      weight: (10 - idx) * 10,
+      weight: weights[idx] ?? 0,
       fill: selectedTopic.color,
     }))
   }, [selectedTopic, ldaResult.topics])
