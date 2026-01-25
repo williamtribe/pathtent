@@ -425,10 +425,17 @@ export interface LDARequest {
   max_df?: number
 }
 
+export interface TopicCoordinate {
+  x: number
+  y: number
+}
+
 export interface Topic {
   id: number
   keywords: string[]
   weight: number
+  coordinate?: TopicCoordinate | null
+  label?: string
 }
 
 export interface DocumentTopic {

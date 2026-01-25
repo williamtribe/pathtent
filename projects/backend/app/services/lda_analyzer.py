@@ -4,10 +4,18 @@ import asyncio
 import re
 from pathlib import Path
 
+import numpy as np
 from gensim import corpora
 from gensim.models import CoherenceModel, LdaModel
+from sklearn.decomposition import PCA
 
-from app.schemas.lda import DocumentTopic, LDARequest, LDAResponse, Topic
+from app.schemas.lda import (
+    DocumentTopic,
+    LDARequest,
+    LDAResponse,
+    Topic,
+    TopicCoordinate,
+)
 
 # Path to stopwords file (Korean language stopwords loaded at runtime)
 STOPWORDS_FILE = Path(__file__).parent.parent / "data" / "korean_stopwords.txt"
@@ -207,7 +215,25 @@ class LDAAnalyzer:
             )
             coherence_score = coherence_model.get_coherence()
 
-            # Extract topics with keywords
+            # Extract topic-word distribution matrix for PCA
+            topic_word_matrix = model.get_topics()  # shape: (num_topics, vocab_size)
+
+            # Compute PCA for 2D visualization
+            if num_topics >= 2:
+                pca = PCA(n_components=2)
+                topic_coords_2d = pca.fit_transform(topic_word_matrix)
+                # Normalize to 0-100 range for visualization
+                coords_min = topic_coords_2d.min(axis=0)
+                coords_max = topic_coords_2d.max(axis=0)
+                coords_range = coords_max - coords_min
+                coords_range[coords_range == 0] = 1  # Avoid division by zero
+                topic_coords_normalized = (
+                    (topic_coords_2d - coords_min) / coords_range
+                ) * 80 + 10  # 10-90 range
+            else:
+                topic_coords_normalized = np.array([[50, 50]])
+
+            # Extract topics with keywords, coordinates, and labels
             topics: list[Topic] = []
             for topic_id in range(num_topics):
                 # Get top 10 words for this topic
@@ -215,11 +241,22 @@ class LDAAnalyzer:
                 keywords = [word for word, _ in topic_terms]
                 weight = sum(prob for _, prob in topic_terms)
 
+                # Create coordinate from PCA
+                coord = TopicCoordinate(
+                    x=float(topic_coords_normalized[topic_id, 0]),
+                    y=float(topic_coords_normalized[topic_id, 1]),
+                )
+
+                # Generate label from top 3 keywords
+                label = ", ".join(keywords[:3])
+
                 topics.append(
                     Topic(
                         id=topic_id,
                         keywords=keywords,
                         weight=weight,
+                        coordinate=coord,
+                        label=label,
                     )
                 )
 

@@ -28,6 +28,13 @@ class LDARequest(BaseModel):
     )
 
 
+class TopicCoordinate(BaseModel):
+    """2D coordinate for topic visualization (PCA projection)."""
+
+    x: float = Field(..., description="PC1 coordinate")
+    y: float = Field(..., description="PC2 coordinate")
+
+
 class Topic(BaseModel):
     """Single topic from LDA analysis."""
 
@@ -42,6 +49,14 @@ class Topic(BaseModel):
     weight: float = Field(
         ...,
         description="Topic weight/importance in the corpus",
+    )
+    coordinate: TopicCoordinate | None = Field(
+        default=None,
+        description="2D PCA coordinate for visualization",
+    )
+    label: str = Field(
+        default="",
+        description="Auto-generated topic label from top keywords",
     )
 
 
