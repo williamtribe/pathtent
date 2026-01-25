@@ -71,13 +71,8 @@ export function LDAVisualization({
     })
   }, [ldaResult])
 
-  // Calculate axis domain to center at origin with padding
-  const axisDomain = useMemo(() => {
-    if (topicData.length === 0) return { min: -1, max: 1 }
-    const allCoords = topicData.flatMap((t) => [Math.abs(t.x), Math.abs(t.y)])
-    const maxAbs = Math.max(...allCoords, 0.1) * 1.2 // 20% padding
-    return { min: -maxAbs, max: maxAbs }
-  }, [topicData])
+  // Fixed axis domain: JS divergence is 0-1, so MDS coords are roughly -1 to 1
+  const axisDomain = { min: -1, max: 1 }
 
   // Pie chart data with keyword labels
   const pieData = useMemo(() => {
