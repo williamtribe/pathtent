@@ -12,17 +12,11 @@ import {
   Cloud,
   TrendingUp,
   ArrowRight,
+  Filter,
 } from "lucide-react"
 
-const features = [
-  {
-    id: "generate",
-    title: "Patent Drafting",
-    description: "AI-powered patent specification drafting from research papers",
-    icon: FileText,
-    href: "/generate",
-    status: "active" as const,
-  },
+// Category 1: Patent Analysis
+const patentAnalysisFeatures = [
   {
     id: "formula",
     title: "Search Formula Generator",
@@ -32,20 +26,35 @@ const features = [
     status: "active" as const,
   },
   {
-    id: "sna",
-    title: "SNA Analysis",
-    description: "Social Network Analysis for patent citation and collaboration patterns",
-    icon: Network,
-    href: "/sna",
-    status: "active" as const,
+    id: "noise-removal",
+    title: "Noise Removal",
+    description: "Filter and select relevant patents from search results for accurate analysis",
+    icon: Filter,
+    href: "/noise-removal",
+    status: "coming-soon" as const,
   },
-  // @TODO-13 — Change LDA status to active
   {
     id: "lda",
     title: "LDA Clustering",
     description: "Topic modeling and document clustering using LDA algorithm",
     icon: BarChart3,
     href: "/lda",
+    status: "active" as const,
+  },
+  {
+    id: "analytics",
+    title: "Quantitative Analysis",
+    description: "Statistical analysis and trend visualization of patent data",
+    icon: TrendingUp,
+    href: "/analytics",
+    status: "coming-soon" as const,
+  },
+  {
+    id: "sna",
+    title: "SNA Analysis",
+    description: "Social Network Analysis for patent citation and collaboration patterns",
+    icon: Network,
+    href: "/sna",
     status: "active" as const,
   },
   {
@@ -56,15 +65,22 @@ const features = [
     href: "/wordcloud",
     status: "coming-soon" as const,
   },
+]
+
+// Category 2: Patent Drafting
+const patentDraftingFeatures = [
   {
-    id: "analytics",
-    title: "Quantitative Analysis",
-    description: "Statistical analysis and trend visualization of patent data",
-    icon: TrendingUp,
-    href: "/analytics",
-    status: "coming-soon" as const,
+    id: "generate",
+    title: "Patent Drafting",
+    description: "AI-powered patent specification drafting from research papers",
+    icon: FileText,
+    href: "/generate",
+    status: "active" as const,
   },
 ]
+
+// Combined for type inference in components
+const features = [...patentAnalysisFeatures, ...patentDraftingFeatures]
 
 function FadeInWrapper({ children, delay = 0 }: { children: ReactNode; delay?: number }) {
   const { ref, isVisible } = useFadeIn(0.1)
@@ -173,21 +189,42 @@ export default function DashboardPage() {
             </p>
           </FadeInWrapper>
         </div>
-      </section>
+       </section>
 
+       {/* Category 1: Patent Analysis */}
       <section className="px-6 py-12 md:py-16">
         <div className="mx-auto max-w-7xl">
           <FadeInWrapper>
             <div className="mb-10 flex items-center gap-3">
               <div className="h-1 w-8 rounded-full bg-gradient-to-r from-rose-500 to-orange-500" />
               <h2 className="text-text-muted text-sm font-semibold tracking-wider uppercase">
-                Analysis Modules
+                특허 분석
               </h2>
             </div>
           </FadeInWrapper>
 
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {features.map((feature, index) => (
+            {patentAnalysisFeatures.map((feature, index) => (
+              <FeatureCard key={feature.id} feature={feature} index={index} />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Category 2: Patent Drafting */}
+      <section className="px-6 pt-8 pb-16 md:pt-12 md:pb-24">
+        <div className="mx-auto max-w-7xl">
+          <FadeInWrapper>
+            <div className="mb-10 flex items-center gap-3">
+              <div className="h-1 w-8 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500" />
+              <h2 className="text-text-muted text-sm font-semibold tracking-wider uppercase">
+                명세서 작성
+              </h2>
+            </div>
+          </FadeInWrapper>
+
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {patentDraftingFeatures.map((feature, index) => (
               <FeatureCard key={feature.id} feature={feature} index={index} />
             ))}
           </div>
