@@ -15,7 +15,11 @@ from app.services.noise_removal import NoiseRemovalService
 router = APIRouter(tags=["noise-removal"])
 
 
-@router.post("/noise-removal/process", response_model=NoiseRemovalResponse)
+@router.post(
+    "/noise-removal/process",
+    response_model=NoiseRemovalResponse,
+    response_model_by_alias=False,
+)
 async def process_noise_removal(
     request: NoiseRemovalRequest,
 ) -> NoiseRemovalResponse:
