@@ -25,7 +25,11 @@ class KIPRISClient:
         self._base_url = (
             "http://plus.kipris.or.kr/kipo-api/kipi/patUtiModInfoSearchSevice"
         )
-        self._client = httpx.AsyncClient(timeout=httpx.Timeout(timeout, connect=10.0))
+        # follow_redirects=False to catch 302 errors explicitly (usually indicates API key issues)
+        self._client = httpx.AsyncClient(
+            timeout=httpx.Timeout(timeout, connect=10.0),
+            follow_redirects=False,
+        )
 
     async def __aenter__(self) -> Self:
         return self
@@ -201,11 +205,19 @@ class KIPRISClient:
         )
 
     async def free_search(self, params: FreeSearchParams) -> FreeSearchResponse:
-        query_params = params.model_dump(by_alias=True, exclude_none=True)
+        query_params = params.to_query_params()
         query_params["accessKey"] = self._service_key
 
         url = "http://plus.kipris.or.kr/openapi/rest/patUtiModInfoSearchSevice/freeSearchInfo"
         response = await self._client.get(url, params=query_params)
+
+        # KIPRIS returns 302 redirect when API key is invalid or request format is wrong
+        if response.status_code == 302:
+            raise ValueError(
+                f"KIPRIS API returned redirect (302). This usually indicates an invalid API key. "
+                f"Redirect location: {response.headers.get('location', 'unknown')}"
+            )
+
         response.raise_for_status()
 
         root = ET.fromstring(response.text)
