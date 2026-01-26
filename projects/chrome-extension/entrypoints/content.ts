@@ -63,14 +63,17 @@ export default defineContentScript({
         .chat-header {
           background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
           color: white;
-          padding: 20px;
+          padding: 12px 16px;
           display: flex;
           justify-content: space-between;
           align-items: center;
+          flex-wrap: nowrap;
         }
         .chat-header h1 {
-          font-size: 18px;
+          font-size: 16px;
           font-weight: 600;
+          white-space: nowrap;
+          flex-shrink: 0;
         }
         .close-btn {
           background: none;
@@ -186,11 +189,13 @@ export default defineContentScript({
           color: white;
           border: none;
           border-radius: 8px;
-          padding: 8px 16px;
-          font-size: 12px;
+          padding: 6px 12px;
+          font-size: 11px;
           font-weight: 600;
           cursor: pointer;
           transition: all 0.3s ease;
+          white-space: nowrap;
+          flex-shrink: 0;
         }
         .reset-btn:hover {
           background: #dc2626;
