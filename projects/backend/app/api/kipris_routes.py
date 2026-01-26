@@ -48,13 +48,19 @@ async def search_kipris(request: KIPRISSearchRequest) -> KIPRISSearchResponse:
 
     # Build search query (space-separated = OR logic)
     # Remove wildcards (*) - KIPRIS may not support them
-    cleaned_keywords = [
-        kw.rstrip("*") if kw else kw for kw in request.keywords if kw and kw.strip()
-    ]
+    cleaned_keywords = []
+    for kw in request.keywords:
+        if kw and kw.strip():
+            cleaned = kw.rstrip("*").strip()
+            if cleaned:  # Skip empty strings after removing wildcards
+                cleaned_keywords.append(cleaned)
     # Deduplicate while preserving order
     unique_keywords = list(dict.fromkeys(cleaned_keywords))
     # Use up to 15 keywords (Korean + English)
     search_query = " ".join(unique_keywords[:15])
+
+    if not search_query:
+        raise HTTPException(status_code=400, detail="No valid keywords provided")
 
     try:
         patents: list[FreeSearchResult] = []
