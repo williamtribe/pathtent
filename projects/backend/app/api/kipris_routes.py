@@ -47,7 +47,13 @@ async def search_kipris(request: KIPRISSearchRequest) -> KIPRISSearchResponse:
         raise HTTPException(status_code=500, detail="KIPRIS_SERVICE_KEY not configured")
 
     # Build search query (space-separated = OR logic)
-    search_query = " ".join(request.keywords[:5])  # Limit to top 5 keywords
+    # Use more keywords for diverse search, deduplicate
+    unique_keywords = list(
+        dict.fromkeys(request.keywords)
+    )  # Preserve order, remove duplicates
+    search_query = " ".join(
+        unique_keywords[:15]
+    )  # Use up to 15 keywords for broader coverage
 
     try:
         patents: list[FreeSearchResult] = []

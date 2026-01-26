@@ -35,6 +35,7 @@ interface StepState {
   status: "pending" | "running" | "completed" | "failed"
   count?: number | null
   message?: string | null
+  duration?: number | null // seconds
 }
 
 // Step status component
@@ -79,6 +80,9 @@ function StepStatus({ stepState }: { stepState: StepState }) {
           {label}
           {count !== undefined && count !== null && (
             <span className="text-sm font-normal">({count.toLocaleString()}건)</span>
+          )}
+          {stepState.duration !== undefined && stepState.duration !== null && (
+            <span className="text-sm font-normal text-slate-500">({stepState.duration.toFixed(1)}s)</span>
           )}
         </div>
         {message && <div className="mt-1 text-sm opacity-75">{message}</div>}
@@ -194,11 +198,20 @@ export default function LDAPage() {
       // Step 1: Keyword Extraction
       // ========================================
       updateStep("keyword_extraction", { status: "running" })
+      let step1Start = performance.now()
 
       let formulaResult: FormulaResult
+      let allKeywords: string[] = []
       try {
         formulaResult = await generateFormula(description, {})
-        setGeneratedKeywords(formulaResult.keywords)
+        
+        // Collect all keywords from categories (includes typos, variations, etc.)
+        if (formulaResult.categories && formulaResult.categories.length > 0) {
+          allKeywords = formulaResult.categories.flatMap((cat) => cat.keywords)
+        } else {
+          allKeywords = formulaResult.keywords
+        }
+        setGeneratedKeywords(allKeywords)
 
         // Auto-generate noise config from description if not set
         if (!customNoiseConfig) {
@@ -208,10 +221,12 @@ export default function LDAPage() {
           })
         }
 
+        const step1Duration = (performance.now() - step1Start) / 1000
         updateStep("keyword_extraction", {
           status: "completed",
-          count: formulaResult.keywords.length,
-          message: formulaResult.keywords.slice(0, 5).join(", "),
+          count: allKeywords.length,
+          message: allKeywords.slice(0, 5).join(", "),
+          duration: step1Duration,
         })
       } catch (err) {
         updateStep("keyword_extraction", {
@@ -225,11 +240,12 @@ export default function LDAPage() {
       // Step 2: KIPRIS Search
       // ========================================
       updateStep("kipris_search", { status: "running" })
+      const step2Start = performance.now()
 
       let patents: FreeSearchResult[]
       try {
         const searchResult = await searchKIPRIS({
-          keywords: formulaResult.keywords,
+          keywords: allKeywords,
           max_results: maxPatents,
         })
         patents = searchResult.patents
@@ -238,10 +254,12 @@ export default function LDAPage() {
           collected: searchResult.collected,
         })
 
+        const step2Duration = (performance.now() - step2Start) / 1000
         updateStep("kipris_search", {
           status: "completed",
           count: searchResult.collected,
           message: `총 ${searchResult.total_found.toLocaleString()}건 중 ${searchResult.collected}건 수집`,
+          duration: step2Duration,
         })
       } catch (err) {
         updateStep("kipris_search", {
@@ -258,6 +276,7 @@ export default function LDAPage() {
 
       if (enableNoiseRemoval && patents.length > 0) {
         updateStep("noise_removal", { status: "running" })
+        const step3Start = performance.now()
 
         try {
           const noiseConfig: NoiseRemovalConfig = customNoiseConfig || {
@@ -271,10 +290,12 @@ export default function LDAPage() {
           })
           validPatents = noiseResult.result.valid_patents
 
+          const step3Duration = (performance.now() - step3Start) / 1000
           updateStep("noise_removal", {
             status: "completed",
             count: validPatents.length,
             message: `${patents.length}건 → ${validPatents.length}건 (${patents.length - validPatents.length}건 제거)`,
+            duration: step3Duration,
           })
         } catch (err) {
           updateStep("noise_removal", {
@@ -288,6 +309,7 @@ export default function LDAPage() {
           status: "completed",
           count: patents.length,
           message: enableNoiseRemoval ? "특허 없음" : "비활성화됨",
+          duration: 0,
         })
       }
 
@@ -298,6 +320,7 @@ export default function LDAPage() {
       // ========================================
       if (validPatents.length >= 3) {
         updateStep("lda_analysis", { status: "running" })
+        const step4Start = performance.now()
 
         try {
           const ldaDocuments = validPatents
@@ -318,10 +341,12 @@ export default function LDAPage() {
           })
           setLdaResult(ldaResponse)
 
+          const step4Duration = (performance.now() - step4Start) / 1000
           updateStep("lda_analysis", {
             status: "completed",
             count: ldaResponse.num_topics,
             message: `${ldaResponse.num_topics}개 토픽 추출 (coherence: ${ldaResponse.coherence_score.toFixed(3)})`,
+            duration: step4Duration,
           })
         } catch (err) {
           updateStep("lda_analysis", {
@@ -334,6 +359,7 @@ export default function LDAPage() {
         updateStep("lda_analysis", {
           status: "completed",
           message: "특허 수 부족 (최소 3건 필요)",
+          duration: 0,
         })
       }
     } catch (err) {

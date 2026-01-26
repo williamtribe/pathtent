@@ -8,7 +8,7 @@ class LDARequest(BaseModel):
 
     patents: list[dict[str, str]] = Field(
         ...,
-        min_length=10,
+        min_length=3,
         description="List of patents with 'id' and 'text' (title + abstract) fields",
     )
     num_topics: int | str = Field(

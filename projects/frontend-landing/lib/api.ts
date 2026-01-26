@@ -624,7 +624,14 @@ export async function analyzeLDA(request: LDARequest): Promise<LDAResponse> {
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ detail: 'Unknown error' }))
-    throw new Error(error.detail || `HTTP ${response.status}`)
+    // Handle Pydantic validation errors (array of objects)
+    let message = `HTTP ${response.status}`
+    if (typeof error.detail === 'string') {
+      message = error.detail
+    } else if (Array.isArray(error.detail) && error.detail.length > 0) {
+      message = error.detail.map((e: { msg?: string }) => e.msg || JSON.stringify(e)).join(', ')
+    }
+    throw new Error(message)
   }
 
   return response.json()
