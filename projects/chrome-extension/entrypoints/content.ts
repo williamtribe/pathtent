@@ -205,7 +205,7 @@ export default defineContentScript({
       </div>
       <div class="messages">
         <div class="message assistant">
-          <div class="message-content">안녕하세요! 특허 고객 등록을 도와드릴까요? 🚀<br><br>12단계로 구성된 가이드를 통해 쉽게 등록하실 수 있습니다.</div>
+          <div class="message-content">안녕하세요! 특허 고객 등록을 도와드릴까요? 🚀<br><br>22단계로 구성된 가이드를 통해 쉽게 등록하실 수 있습니다.</div>
         </div>
       </div>
       <div class="quick-actions">
