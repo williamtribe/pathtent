@@ -1,4 +1,3 @@
-# @TODO-2 — Pipeline request/response schemas
 """Unified analysis pipeline schemas.
 
 Pipeline flow: Natural Language → Keywords/IPC → Search → Noise Removal → LDA

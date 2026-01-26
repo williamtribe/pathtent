@@ -1,4 +1,3 @@
-# @TODO-3 — Unified pipeline API endpoint
 """Unified analysis pipeline API routes.
 
 Single endpoint for: Natural Language → Search → Noise Removal → LDA

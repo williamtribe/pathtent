@@ -816,3 +816,69 @@ export async function processNoiseRemoval(
 
   return response.json()
 }
+
+// ============================================================================
+// Unified Analysis Pipeline Types and API
+// ============================================================================
+
+export interface PipelineRequest {
+  description: string
+  max_patents?: number
+  num_topics?: number | "auto"
+  enable_noise_removal?: boolean
+  noise_removal_config?: NoiseRemovalConfig | null
+}
+
+export interface PipelineStepResult {
+  step: string
+  status: string
+  count?: number | null
+  message?: string | null
+}
+
+export interface SearchResultSummary {
+  total_found: number
+  collected: number
+  search_keywords: string[]
+}
+
+export interface NoiseRemovalSummary {
+  input_count: number
+  output_count: number
+  excluded_summary: ExcludedSummary
+  config_used: NoiseRemovalConfig
+}
+
+export interface PipelineResponse {
+  steps: PipelineStepResult[]
+  generated_keywords: string[]
+  generated_synonyms: Record<string, string[]>
+  generated_ipc_codes: string[]
+  generated_noise_config: NoiseRemovalConfig | null
+  search_summary: SearchResultSummary | null
+  noise_removal_summary: NoiseRemovalSummary | null
+  lda_result: LDAResponse | null
+  error: string | null
+}
+
+/**
+ * Run unified analysis pipeline: NL → Keywords → Search → Noise Removal → LDA
+ */
+export async function runAnalysisPipeline(
+  request: PipelineRequest
+): Promise<PipelineResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/analysis/pipeline`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(request),
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: "Unknown error" }))
+    throw new Error(error.detail || `HTTP ${response.status}`)
+  }
+
+  return response.json()
+}

@@ -1,4 +1,3 @@
-# @TODO-1 — Unified analysis pipeline: Natural Language → Search → Noise Removal → LDA
 """Unified analysis pipeline service.
 
 Orchestrates: Natural Language → Keywords/IPC extraction → KIPRIS Search → Noise Removal → LDA
