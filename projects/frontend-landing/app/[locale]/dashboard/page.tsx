@@ -31,7 +31,7 @@ const patentAnalysisFeatures = [
     description: "Filter and select relevant patents from search results for accurate analysis",
     icon: Filter,
     href: "/noise-removal",
-    status: "coming-soon" as const,
+    status: "active" as const,
   },
   {
     id: "lda",
