@@ -61,8 +61,8 @@ async def search_kipris(request: KIPRISSearchRequest) -> KIPRISSearchResponse:
     # Deduplicate while preserving order
     unique_keywords = list(dict.fromkeys(cleaned_keywords))
 
-    # Use top 5 keywords only (too many keywords = poor results)
-    search_query = " ".join(unique_keywords[:5])
+    # Use all available keywords (up to 45) for maximum coverage
+    search_query = " ".join(unique_keywords[:45])
 
     if not search_query:
         raise HTTPException(status_code=400, detail="No valid keywords provided")

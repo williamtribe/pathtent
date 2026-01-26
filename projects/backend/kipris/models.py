@@ -156,26 +156,32 @@ class FreeSearchParams(BaseModel):
 
 
 class FreeSearchResult(BaseModel):
-    serial_number: str | None = Field(None, alias="SerialNumber")
-    application_number: str | None = Field(None, alias="ApplicationNumber")
-    application_date: str | None = Field(None, alias="ApplicationDate")
-    opening_number: str | None = Field(None, alias="OpeningNumber")
-    opening_date: str | None = Field(None, alias="OpeningDate")
-    public_number: str | None = Field(None, alias="PublicNumber")
-    public_date: str | None = Field(None, alias="PublicDate")
-    registration_number: str | None = Field(None, alias="RegistrationNumber")
-    registration_date: str | None = Field(None, alias="RegistrationDate")
-    ipc_number: str | None = Field(
-        None, alias="InternationalpatentclassificationNumber"
-    )
-    invention_name: str | None = Field(None, alias="InventionName")
-    abstract: str | None = Field(None, alias="Abstract")
-    applicant: str | None = Field(None, alias="Applicant")
-    drawing_path: str | None = Field(None, alias="DrawingPath")
-    thumbnail_path: str | None = Field(None, alias="ThumbnailPath")
-    registration_status: str | None = Field(None, alias="RegistrationStatus")
+    """KIPRIS free search result.
 
-    model_config = {"populate_by_name": True, "by_alias": False}
+    Uses validation_alias for input (PascalCase from KIPRIS API)
+    but outputs snake_case field names.
+    """
+
+    serial_number: str | None = Field(None, validation_alias="SerialNumber")
+    application_number: str | None = Field(None, validation_alias="ApplicationNumber")
+    application_date: str | None = Field(None, validation_alias="ApplicationDate")
+    opening_number: str | None = Field(None, validation_alias="OpeningNumber")
+    opening_date: str | None = Field(None, validation_alias="OpeningDate")
+    public_number: str | None = Field(None, validation_alias="PublicNumber")
+    public_date: str | None = Field(None, validation_alias="PublicDate")
+    registration_number: str | None = Field(None, validation_alias="RegistrationNumber")
+    registration_date: str | None = Field(None, validation_alias="RegistrationDate")
+    ipc_number: str | None = Field(
+        None, validation_alias="InternationalpatentclassificationNumber"
+    )
+    invention_name: str | None = Field(None, validation_alias="InventionName")
+    abstract: str | None = Field(None, validation_alias="Abstract")
+    applicant: str | None = Field(None, validation_alias="Applicant")
+    drawing_path: str | None = Field(None, validation_alias="DrawingPath")
+    thumbnail_path: str | None = Field(None, validation_alias="ThumbnailPath")
+    registration_status: str | None = Field(None, validation_alias="RegistrationStatus")
+
+    model_config = {"populate_by_name": True}
 
 
 class FreeSearchResponse(BaseModel):
