@@ -8,6 +8,7 @@ from app.api.patent_routes import router as patent_router
 from app.api.formula_routes import router as formula_router
 from app.api.collection_routes import router as collection_router
 from app.api.lda_routes import router as lda_router
+from app.api.noise_removal_routes import router as noise_removal_router
 
 app = FastAPI(
     title="Patent Specification Generator API",
@@ -51,3 +52,6 @@ app.include_router(collection_router, prefix="/api/v1")
 
 # LDA topic modeling API
 app.include_router(lda_router, prefix="/api/v1")
+
+# Noise removal API
+app.include_router(noise_removal_router, prefix="/api/v1")

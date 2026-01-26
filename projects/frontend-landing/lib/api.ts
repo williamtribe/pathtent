@@ -738,3 +738,81 @@ export async function downloadPatentWord(sessionId: string, title: string): Prom
   window.URL.revokeObjectURL(url)
   document.body.removeChild(a)
 }
+
+// ============================================================================
+// ============================================================================
+
+export interface FreeSearchResult {
+  serial_number?: string | null
+  application_number?: string | null
+  application_date?: string | null
+  invention_name?: string | null
+  abstract?: string | null
+  ipc_number?: string | null
+  applicant?: string | null
+  drawing_path?: string | null
+  registration_status?: string | null
+}
+
+export interface NoiseRemovalConfig {
+  main_category: string
+  sub_categories: string[]
+  include_ipc: string[]
+  exclude_ipc: string[]
+  required_keywords: string[]
+  exclude_keywords: string[]
+  use_embedding_filter: boolean
+  embedding_threshold: number
+}
+
+export interface ExcludedSummary {
+  duplicate: number
+  ipc_excluded: number
+  ipc_not_included: number
+  keyword_missing: number
+  keyword_excluded: number
+  low_similarity: number
+}
+
+export interface NoiseRemovalResult {
+  input_count: number
+  step1_count: number
+  step2_count: number
+  step3_count: number
+  step4_count: number | null
+  final_count: number
+  valid_patents: FreeSearchResult[]
+  excluded_summary: ExcludedSummary
+}
+
+export interface NoiseRemovalRequest {
+  patents: FreeSearchResult[]
+  config: NoiseRemovalConfig
+}
+
+export interface NoiseRemovalResponse {
+  result: NoiseRemovalResult
+  excluded_patents: unknown[] | null
+}
+
+/**
+ * Process patents through the 4-step noise removal pipeline
+ */
+export async function processNoiseRemoval(
+  request: NoiseRemovalRequest
+): Promise<NoiseRemovalResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/noise-removal/process`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(request),
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: "Unknown error" }))
+    throw new Error(error.detail || `HTTP ${response.status}`)
+  }
+
+  return response.json()
+}
