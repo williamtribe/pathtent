@@ -96,7 +96,11 @@ class NoiseRemovalService:
     def _remove_duplicates(
         self, patents: list[FreeSearchResult]
     ) -> tuple[list[FreeSearchResult], list[ExcludedPatent]]:
-        """Remove duplicate patents by application_number.
+        """Remove duplicate patents by application_number and invention_name.
+
+        Removes duplicates that have:
+        - Same application_number (exact duplicate)
+        - Same invention_name (divisional/priority applications)
 
         Args:
             patents: List of patents to deduplicate
@@ -104,18 +108,20 @@ class NoiseRemovalService:
         Returns:
             Tuple of (deduplicated patents, excluded patents)
         """
-        seen: set[str] = set()
+        seen_app_nums: set[str] = set()
+        seen_titles: set[str] = set()
         kept: list[FreeSearchResult] = []
         excluded: list[ExcludedPatent] = []
 
         for patent in patents:
             app_num = patent.application_number
-            if app_num is None:
-                # Keep patents without application_number (edge case)
-                kept.append(patent)
-                continue
+            title = patent.invention_name
 
-            if app_num in seen:
+            # Normalize title for comparison (strip whitespace, lowercase)
+            normalized_title = title.strip().lower() if title else None
+
+            # Check for duplicate by application_number
+            if app_num and app_num in seen_app_nums:
                 excluded.append(
                     ExcludedPatent(
                         patent=patent,
@@ -123,9 +129,25 @@ class NoiseRemovalService:
                         reason="duplicate",
                     )
                 )
-            else:
-                seen.add(app_num)
-                kept.append(patent)
+                continue
+
+            # Check for duplicate by invention_name (same title = likely same invention)
+            if normalized_title and normalized_title in seen_titles:
+                excluded.append(
+                    ExcludedPatent(
+                        patent=patent,
+                        excluded_at_step=1,
+                        reason="duplicate",
+                    )
+                )
+                continue
+
+            # Not a duplicate - keep it
+            if app_num:
+                seen_app_nums.add(app_num)
+            if normalized_title:
+                seen_titles.add(normalized_title)
+            kept.append(patent)
 
         return kept, excluded
 
