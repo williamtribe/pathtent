@@ -69,10 +69,12 @@ async def search_kipris(request: KIPRISSearchRequest) -> KIPRISSearchResponse:
         f"KIPRIS: {len(request.keywords)} input -> {len(unique_keywords)} after filter"
     )
 
-    # Build OR search query using + operator: (kw1+kw2+kw3+...)
-    # KIPRIS uses + for OR logic
-    search_query = "(" + "+".join(unique_keywords) + ")"
-    logger.info(f"KIPRIS OR query: {search_query[:100]}...")
+    # Build AND search query with core keywords only
+    # Use top 3-5 keywords with AND (*) for focused search
+    # Embedding filter will refine results later
+    core_keywords = unique_keywords[:5]
+    search_query = "*".join(core_keywords)
+    logger.info(f"KIPRIS AND query: {search_query}")
 
     if not search_query:
         raise HTTPException(status_code=400, detail="No valid keywords provided")
