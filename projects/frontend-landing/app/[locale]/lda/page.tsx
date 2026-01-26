@@ -166,8 +166,10 @@ export default function LDAPage() {
   // Results state
   const [generatedKeywords, setGeneratedKeywords] = useState<string[]>([])
   const [searchSummary, setSearchSummary] = useState<{ total: number; collected: number } | null>(null)
+  const [searchedPatents, setSearchedPatents] = useState<FreeSearchResult[]>([])  // Cached search results
   const [filteredPatents, setFilteredPatents] = useState<FreeSearchResult[]>([])
   const [numTopics, setNumTopics] = useState(5)
+  const [isRerunningNoiseRemoval, setIsRerunningNoiseRemoval] = useState(false)
   const [isRerunningLDA, setIsRerunningLDA] = useState(false)
   const [ldaResult, setLdaResult] = useState<LDAResponse | null>(null)
 
@@ -255,6 +257,7 @@ export default function LDAPage() {
           max_results: maxPatents,
         })
         patents = searchResult.patents
+        setSearchedPatents(patents)  // Cache for re-filtering
         setSearchSummary({
           total: searchResult.total_found,
           collected: searchResult.collected,
@@ -374,6 +377,59 @@ export default function LDAPage() {
       setIsRunning(false)
     }
   }, [description, maxPatents, enableNoiseRemoval, customNoiseConfig])
+
+  // Re-run noise removal + LDA with different threshold (using cached search results)
+  const handleRerunNoiseRemoval = useCallback(async () => {
+    if (searchedPatents.length === 0) {
+      setError("캐싱된 검색 결과가 없습니다. 먼저 분석을 실행하세요.")
+      return
+    }
+    if (!customNoiseConfig) {
+      setError("노이즈 제거 설정이 없습니다.")
+      return
+    }
+
+    setIsRerunningNoiseRemoval(true)
+    setError(null)
+
+    try {
+      // Step 1: Noise Removal with new threshold
+      const noiseResult = await processNoiseRemoval({
+        patents: searchedPatents,
+        config: customNoiseConfig,
+      })
+      const validPatents = noiseResult.result.valid_patents
+      setFilteredPatents(validPatents)
+
+      // Step 2: LDA Analysis
+      if (validPatents.length >= 3) {
+        const ldaDocuments = validPatents
+          .map((patent) => {
+            const textParts: string[] = []
+            if (patent.invention_name) textParts.push(patent.invention_name)
+            if (patent.abstract) textParts.push(patent.abstract)
+            return {
+              id: patent.application_number || `patent-${Math.random()}`,
+              text: textParts.join(" "),
+            }
+          })
+          .filter((doc) => doc.text.trim().length > 0)
+
+        const newLdaResult = await analyzeLDA({
+          patents: ldaDocuments,
+          num_topics: numTopics,
+        })
+        setLdaResult(newLdaResult)
+      } else {
+        setLdaResult(null)
+        setError(`필터링 후 특허가 ${validPatents.length}건으로 LDA 분석이 불가합니다 (최소 3건 필요)`)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "노이즈 제거 재실행 실패")
+    } finally {
+      setIsRerunningNoiseRemoval(false)
+    }
+  }, [searchedPatents, customNoiseConfig, numTopics])
 
   // Re-run LDA with different topic count (without re-running entire pipeline)
   const handleRerunLDA = useCallback(async () => {
@@ -508,11 +564,33 @@ export default function LDAPage() {
                   exit={{ opacity: 0, height: 0 }}
                 >
                   {customNoiseConfig ? (
-                    <NoiseConfigEditor
-                      config={customNoiseConfig}
-                      onChange={setCustomNoiseConfig}
-                      disabled={!enableNoiseRemoval}
-                    />
+                    <div className="space-y-3">
+                      <NoiseConfigEditor
+                        config={customNoiseConfig}
+                        onChange={setCustomNoiseConfig}
+                        disabled={!enableNoiseRemoval}
+                      />
+                      {/* Re-filter button (only show if we have cached search results) */}
+                      {searchedPatents.length > 0 && enableNoiseRemoval && (
+                        <button
+                          onClick={handleRerunNoiseRemoval}
+                          disabled={isRerunningNoiseRemoval}
+                          className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-600 px-4 py-2 text-sm font-medium text-white transition-all hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {isRerunningNoiseRemoval ? (
+                            <>
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              재필터링 중...
+                            </>
+                          ) : (
+                            <>
+                              <RefreshCw className="h-4 w-4" />
+                              임계값 변경 후 재필터링 ({searchedPatents.length}건)
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
                   ) : (
                     <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-center text-sm text-slate-500">
                       분석을 실행하면 AI가 생성한 노이즈 제거 설정이 여기에 표시됩니다.
