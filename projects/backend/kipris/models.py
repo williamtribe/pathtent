@@ -175,7 +175,7 @@ class FreeSearchResult(BaseModel):
     thumbnail_path: str | None = Field(None, alias="ThumbnailPath")
     registration_status: str | None = Field(None, alias="RegistrationStatus")
 
-    model_config = {"populate_by_name": True}
+    model_config = {"populate_by_name": True, "by_alias": False}
 
 
 class FreeSearchResponse(BaseModel):
