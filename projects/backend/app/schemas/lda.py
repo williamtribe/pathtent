@@ -1,15 +1,42 @@
+# @TODO-2 — Add patent metadata fields to request
 """LDA topic modeling API schemas for patent analysis."""
 
 from pydantic import BaseModel, Field
+
+from app.schemas.quantitative import QuantitativeResult
+
+
+class PatentMetadata(BaseModel):
+    """Optional metadata for quantitative analysis."""
+
+    application_date: str | None = Field(
+        default=None,
+        description="Application date (YYYYMMDD or YYYY-MM-DD format)",
+    )
+    ipc_codes: list[str] = Field(
+        default_factory=list,
+        description="IPC classification codes",
+    )
+
+
+class PatentForLDA(BaseModel):
+    """Patent data for LDA analysis with optional metadata."""
+
+    id: str = Field(..., description="Patent application number or ID")
+    text: str = Field(..., description="Text content (title + abstract)")
+    metadata: PatentMetadata | None = Field(
+        default=None,
+        description="Optional metadata for quantitative analysis",
+    )
 
 
 class LDARequest(BaseModel):
     """Request model for LDA topic modeling analysis."""
 
-    patents: list[dict[str, str]] = Field(
+    patents: list[PatentForLDA | dict[str, str]] = Field(
         ...,
         min_length=3,
-        description="List of patents with 'id' and 'text' (title + abstract) fields",
+        description="List of patents with 'id' and 'text' fields, optionally with metadata",
     )
     num_topics: int | str = Field(
         default="auto",
@@ -87,6 +114,7 @@ class DocumentTopic(BaseModel):
     )
 
 
+# @TODO-3 — Add quantitative field to LDAResponse
 class LDAResponse(BaseModel):
     """Response model for LDA topic modeling results."""
 
@@ -109,4 +137,8 @@ class LDAResponse(BaseModel):
     vocabulary_size: int = Field(
         ...,
         description="Number of unique terms in the vocabulary",
+    )
+    quantitative: QuantitativeResult | None = Field(
+        default=None,
+        description="Quantitative analysis results (yearly trend, tech field distribution, IPC distribution)",
     )
