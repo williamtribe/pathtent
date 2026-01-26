@@ -34,7 +34,9 @@ class KIPRISSearchResponse(BaseModel):
     search_query: str
 
 
-@router.post("/kipris/search", response_model=KIPRISSearchResponse)
+@router.post(
+    "/kipris/search", response_model=KIPRISSearchResponse, response_model_by_alias=False
+)
 async def search_kipris(request: KIPRISSearchRequest) -> KIPRISSearchResponse:
     """Search KIPRIS using freeSearchInfo API.
 
