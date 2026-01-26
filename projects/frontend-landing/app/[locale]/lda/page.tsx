@@ -391,18 +391,34 @@ export default function LDAPage() {
 
     setIsRerunningNoiseRemoval(true)
     setError(null)
+    
+    // Update pipeline steps - noise_removal and lda_analysis to running
+    updateStep("noise_removal", { status: "running", count: null, message: null, duration: null })
+    updateStep("lda_analysis", { status: "pending", count: null, message: null, duration: null })
 
     try {
       // Step 1: Noise Removal with new threshold
+      const step3Start = performance.now()
       const noiseResult = await processNoiseRemoval({
         patents: searchedPatents,
         config: customNoiseConfig,
       })
       const validPatents = noiseResult.result.valid_patents
       setFilteredPatents(validPatents)
+      
+      const step3Duration = (performance.now() - step3Start) / 1000
+      updateStep("noise_removal", {
+        status: "completed",
+        count: validPatents.length,
+        message: `${searchedPatents.length}건 → ${validPatents.length}건 (${searchedPatents.length - validPatents.length}건 제거)`,
+        duration: step3Duration,
+      })
 
       // Step 2: LDA Analysis
       if (validPatents.length >= 3) {
+        updateStep("lda_analysis", { status: "running" })
+        const step4Start = performance.now()
+        
         const ldaDocuments = validPatents
           .map((patent) => {
             const textParts: string[] = []
@@ -420,11 +436,25 @@ export default function LDAPage() {
           num_topics: numTopics,
         })
         setLdaResult(newLdaResult)
+        
+        const step4Duration = (performance.now() - step4Start) / 1000
+        updateStep("lda_analysis", {
+          status: "completed",
+          count: newLdaResult.num_topics,
+          message: `${newLdaResult.num_topics}개 토픽 추출 (coherence: ${newLdaResult.coherence_score.toFixed(3)})`,
+          duration: step4Duration,
+        })
       } else {
         setLdaResult(null)
+        updateStep("lda_analysis", {
+          status: "completed",
+          message: `특허 수 부족 (${validPatents.length}건, 최소 3건 필요)`,
+          duration: 0,
+        })
         setError(`필터링 후 특허가 ${validPatents.length}건으로 LDA 분석이 불가합니다 (최소 3건 필요)`)
       }
     } catch (err) {
+      updateStep("noise_removal", { status: "failed", message: err instanceof Error ? err.message : "실패" })
       setError(err instanceof Error ? err.message : "노이즈 제거 재실행 실패")
     } finally {
       setIsRerunningNoiseRemoval(false)
