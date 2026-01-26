@@ -79,31 +79,47 @@ class GeminiEmbeddingService:
 
         return await asyncio.to_thread(_embed_sync)
 
-    async def embed_batch(self, texts: list[str]) -> list[list[float]]:
+    async def embed_batch(
+        self, texts: list[str], batch_size: int = 100
+    ) -> list[list[float]]:
         """
-        Generate embeddings for multiple texts.
+        Generate embeddings for multiple texts using true batch API calls.
+
+        Processes texts in batches to minimize API calls while staying within limits.
+        With RPM=1000, batch_size=100 allows 100k texts/min theoretical max.
 
         Args:
             texts: List of texts to embed
+            batch_size: Number of texts per API call (default 100)
 
         Returns:
-            List of 3072-dimensional embedding vectors
+            List of embedding vectors (same order as input)
         """
         truncated_texts = [truncate_to_token_limit(text) for text in texts]
 
         def _embed_batch_sync() -> list[list[float]]:
-            results: list[list[float]] = []
-            for text in truncated_texts:
+            all_results: list[list[float]] = []
+
+            # Process in batches
+            for i in range(0, len(truncated_texts), batch_size):
+                batch = truncated_texts[i : i + batch_size]
+
+                # Single API call for entire batch
                 result = self.client.models.embed_content(
-                    model=self.model, contents=text
+                    model=self.model, contents=batch
                 )
+
                 embeddings = result.embeddings
-                if embeddings is None or len(embeddings) == 0:
-                    raise ValueError("No embeddings returned")
-                embedding = embeddings[0]
-                if embedding.values is None:
-                    raise ValueError("Embedding values is None")
-                results.append(list(embedding.values))
-            return results
+                if embeddings is None or len(embeddings) != len(batch):
+                    raise ValueError(
+                        f"Expected {len(batch)} embeddings, got {len(embeddings) if embeddings else 0}"
+                    )
+
+                for embedding in embeddings:
+                    if embedding.values is None:
+                        raise ValueError("Embedding values is None")
+                    all_results.append(list(embedding.values))
+
+            return all_results
 
         return await asyncio.to_thread(_embed_batch_sync)

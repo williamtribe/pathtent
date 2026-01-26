@@ -1,4 +1,4 @@
-// @TODO-12 — Unified LDA analysis page with integrated pipeline
+// @TODO-3 — Unified LDA analysis with step-by-step API calls
 "use client"
 
 import { useState, useCallback } from "react"
@@ -15,24 +15,32 @@ import {
   CheckCircle,
   XCircle,
   Circle,
+  RefreshCw,
 } from "lucide-react"
-import { runAnalysisPipeline, type PipelineResponse, type NoiseRemovalConfig } from "../../../lib/api"
+import {
+  generateFormula,
+  searchKIPRIS,
+  processNoiseRemoval,
+  analyzeLDA,
+  type NoiseRemovalConfig,
+  type FreeSearchResult,
+  type LDAResponse,
+  type FormulaResult,
+} from "../../../lib/api"
 import { LDAVisualization } from "../../../components/lda-visualization"
 
-// Step status component
-function StepStatus({
-  step,
-  status,
-  count,
-  message,
-  isActive,
-}: {
+// Step definition
+interface StepState {
   step: string
-  status: string
+  status: "pending" | "running" | "completed" | "failed"
   count?: number | null
   message?: string | null
-  isActive: boolean
-}) {
+}
+
+// Step status component
+function StepStatus({ stepState }: { stepState: StepState }) {
+  const { step, status, count, message } = stepState
+
   const stepLabels: Record<string, { icon: React.ReactNode; label: string }> = {
     keyword_extraction: { icon: <Sparkles className="h-4 w-4" />, label: "키워드 추출" },
     kipris_search: { icon: <Search className="h-4 w-4" />, label: "특허 검색" },
@@ -49,7 +57,7 @@ function StepStatus({
           ? "bg-green-50 text-green-800"
           : status === "failed"
             ? "bg-red-50 text-red-800"
-            : isActive
+            : status === "running"
               ? "bg-blue-50 text-blue-800"
               : "bg-gray-50 text-gray-500"
       }`}
@@ -59,7 +67,7 @@ function StepStatus({
           <CheckCircle className="h-5 w-5 text-green-600" />
         ) : status === "failed" ? (
           <XCircle className="h-5 w-5 text-red-600" />
-        ) : isActive ? (
+        ) : status === "running" ? (
           <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
         ) : (
           <Circle className="h-5 w-5 text-gray-400" />
@@ -79,74 +87,67 @@ function StepStatus({
   )
 }
 
-// Noise config editor component
+// Noise config editor component (similarity-based filtering)
 function NoiseConfigEditor({
   config,
   onChange,
+  disabled,
 }: {
   config: NoiseRemovalConfig
   onChange: (config: NoiseRemovalConfig) => void
+  disabled?: boolean
 }) {
-  const updateField = <K extends keyof NoiseRemovalConfig>(key: K, value: NoiseRemovalConfig[K]) => {
-    onChange({ ...config, [key]: value })
-  }
-
   return (
-    <div className="space-y-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+    <div className={`space-y-4 rounded-lg border border-slate-200 bg-slate-50 p-4 ${disabled ? "opacity-50" : ""}`}>
       <div>
-        <label className="mb-1 block text-sm font-medium text-slate-700">필수 키워드 (OR 조건)</label>
-        <input
-          type="text"
-          value={config.required_keywords.join(", ")}
-          onChange={(e) => updateField("required_keywords", e.target.value.split(",").map((s) => s.trim()).filter(Boolean))}
-          className="w-full rounded border border-slate-300 p-2 text-sm"
-          placeholder="키워드1, 키워드2, ..."
+        <label className="mb-1 block text-sm font-medium text-slate-700">유사도 필터링 기준 문장</label>
+        <textarea
+          value={config.embedding_query}
+          onChange={(e) => onChange({ ...config, embedding_query: e.target.value })}
+          className="w-full rounded border border-slate-300 p-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-100"
+          rows={3}
+          placeholder="관련 특허를 필터링할 기준이 되는 기술 설명..."
+          disabled={disabled}
         />
-        <p className="mt-1 text-xs text-slate-500">하나라도 매칭되면 유지됩니다</p>
+        <p className="mt-1 text-xs text-slate-500">이 문장과 유사한 특허만 분석에 포함됩니다</p>
       </div>
 
       <div>
-        <label className="mb-1 block text-sm font-medium text-slate-700">제외 키워드</label>
+        <label className="mb-1 block text-sm font-medium text-slate-700">
+          유사도 임계값: {config.embedding_threshold.toFixed(2)}
+        </label>
         <input
-          type="text"
-          value={config.exclude_keywords.join(", ")}
-          onChange={(e) => updateField("exclude_keywords", e.target.value.split(",").map((s) => s.trim()).filter(Boolean))}
-          className="w-full rounded border border-slate-300 p-2 text-sm"
-          placeholder="제외할 키워드..."
+          type="range"
+          min="0"
+          max="1"
+          step="0.05"
+          value={config.embedding_threshold}
+          onChange={(e) => onChange({ ...config, embedding_threshold: parseFloat(e.target.value) })}
+          className="w-full disabled:cursor-not-allowed"
+          disabled={disabled}
         />
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">포함 IPC</label>
-          <input
-            type="text"
-            value={config.include_ipc.join(", ")}
-            onChange={(e) => updateField("include_ipc", e.target.value.split(",").map((s) => s.trim()).filter(Boolean))}
-            className="w-full rounded border border-slate-300 p-2 text-sm"
-            placeholder="G06F*, B60L*"
-          />
+        <div className="flex justify-between text-xs text-slate-500">
+          <span>0.0 (느슨함)</span>
+          <span>1.0 (엄격함)</span>
         </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">제외 IPC</label>
-          <input
-            type="text"
-            value={config.exclude_ipc.join(", ")}
-            onChange={(e) => updateField("exclude_ipc", e.target.value.split(",").map((s) => s.trim()).filter(Boolean))}
-            className="w-full rounded border border-slate-300 p-2 text-sm"
-            placeholder="E04*, B23K*"
-          />
-        </div>
+        <p className="mt-1 text-xs text-slate-500">높을수록 더 관련성 높은 특허만 유지됩니다</p>
       </div>
     </div>
   )
 }
 
+// Initial steps state
+const initialSteps: StepState[] = [
+  { step: "keyword_extraction", status: "pending" },
+  { step: "kipris_search", status: "pending" },
+  { step: "noise_removal", status: "pending" },
+  { step: "lda_analysis", status: "pending" },
+]
+
 export default function LDAPage() {
   // Input state
   const [description, setDescription] = useState("")
   const [maxPatents, setMaxPatents] = useState(500)
-  const [numTopics, setNumTopics] = useState<number | "auto">("auto")
   const [enableNoiseRemoval, setEnableNoiseRemoval] = useState(true)
 
   // Advanced settings
@@ -156,7 +157,22 @@ export default function LDAPage() {
   // Pipeline state
   const [isRunning, setIsRunning] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [result, setResult] = useState<PipelineResponse | null>(null)
+  const [steps, setSteps] = useState<StepState[]>(initialSteps)
+
+  // Results state
+  const [generatedKeywords, setGeneratedKeywords] = useState<string[]>([])
+  const [searchSummary, setSearchSummary] = useState<{ total: number; collected: number } | null>(null)
+  const [filteredPatents, setFilteredPatents] = useState<FreeSearchResult[]>([])
+  const [numTopics, setNumTopics] = useState(5)
+  const [isRerunningLDA, setIsRerunningLDA] = useState(false)
+  const [ldaResult, setLdaResult] = useState<LDAResponse | null>(null)
+
+  // Helper to update a specific step
+  const updateStep = (stepName: string, updates: Partial<StepState>) => {
+    setSteps((prev) =>
+      prev.map((s) => (s.step === stepName ? { ...s, ...updates } : s))
+    )
+  }
 
   const handleRun = useCallback(async () => {
     if (!description.trim() || description.length < 10) {
@@ -164,43 +180,215 @@ export default function LDAPage() {
       return
     }
 
+    // Reset state
     setIsRunning(true)
     setError(null)
-    setResult(null)
+    setSteps(initialSteps)
+    setGeneratedKeywords([])
+    setSearchSummary(null)
+    setFilteredPatents([])
+    setLdaResult(null)
 
     try {
-      const response = await runAnalysisPipeline({
-        description,
-        max_patents: maxPatents,
-        num_topics: numTopics,
-        enable_noise_removal: enableNoiseRemoval,
-        noise_removal_config: customNoiseConfig,
-      })
+      // ========================================
+      // Step 1: Keyword Extraction
+      // ========================================
+      updateStep("keyword_extraction", { status: "running" })
 
-      setResult(response)
+      let formulaResult: FormulaResult
+      try {
+        formulaResult = await generateFormula(description, {})
+        setGeneratedKeywords(formulaResult.keywords)
 
-      // Update custom noise config with generated one if not already set
-      if (!customNoiseConfig && response.generated_noise_config) {
-        setCustomNoiseConfig(response.generated_noise_config)
+        // Auto-generate noise config from description if not set
+        if (!customNoiseConfig) {
+          setCustomNoiseConfig({
+            embedding_query: description,
+            embedding_threshold: 0.3,
+          })
+        }
+
+        updateStep("keyword_extraction", {
+          status: "completed",
+          count: formulaResult.keywords.length,
+          message: formulaResult.keywords.slice(0, 5).join(", "),
+        })
+      } catch (err) {
+        updateStep("keyword_extraction", {
+          status: "failed",
+          message: err instanceof Error ? err.message : "키워드 추출 실패",
+        })
+        throw err
       }
 
-      if (response.error) {
-        setError(response.error)
+      // ========================================
+      // Step 2: KIPRIS Search
+      // ========================================
+      updateStep("kipris_search", { status: "running" })
+
+      let patents: FreeSearchResult[]
+      try {
+        const searchResult = await searchKIPRIS({
+          keywords: formulaResult.keywords,
+          max_results: maxPatents,
+        })
+        patents = searchResult.patents
+        setSearchSummary({
+          total: searchResult.total_found,
+          collected: searchResult.collected,
+        })
+
+        updateStep("kipris_search", {
+          status: "completed",
+          count: searchResult.collected,
+          message: `총 ${searchResult.total_found.toLocaleString()}건 중 ${searchResult.collected}건 수집`,
+        })
+      } catch (err) {
+        updateStep("kipris_search", {
+          status: "failed",
+          message: err instanceof Error ? err.message : "특허 검색 실패",
+        })
+        throw err
+      }
+
+      // ========================================
+      // Step 3: Noise Removal (optional)
+      // ========================================
+      let validPatents = patents
+
+      if (enableNoiseRemoval && patents.length > 0) {
+        updateStep("noise_removal", { status: "running" })
+
+        try {
+          const noiseConfig: NoiseRemovalConfig = customNoiseConfig || {
+            embedding_query: description,
+            embedding_threshold: 0.3,
+          }
+
+          const noiseResult = await processNoiseRemoval({
+            patents,
+            config: noiseConfig,
+          })
+          validPatents = noiseResult.result.valid_patents
+
+          updateStep("noise_removal", {
+            status: "completed",
+            count: validPatents.length,
+            message: `${patents.length}건 → ${validPatents.length}건 (${patents.length - validPatents.length}건 제거)`,
+          })
+        } catch (err) {
+          updateStep("noise_removal", {
+            status: "failed",
+            message: err instanceof Error ? err.message : "노이즈 제거 실패",
+          })
+          throw err
+        }
+      } else {
+        updateStep("noise_removal", {
+          status: "completed",
+          count: patents.length,
+          message: enableNoiseRemoval ? "특허 없음" : "비활성화됨",
+        })
+      }
+
+      setFilteredPatents(validPatents)
+
+      // ========================================
+      // Step 4: LDA Analysis
+      // ========================================
+      if (validPatents.length >= 3) {
+        updateStep("lda_analysis", { status: "running" })
+
+        try {
+          const ldaDocuments = validPatents
+            .map((patent) => {
+              const textParts: string[] = []
+              if (patent.invention_name) textParts.push(patent.invention_name)
+              if (patent.abstract) textParts.push(patent.abstract)
+              return {
+                id: patent.application_number || `patent-${Math.random()}`,
+                text: textParts.join(" "),
+              }
+            })
+            .filter((doc) => doc.text.trim().length > 0)
+
+          const ldaResponse = await analyzeLDA({
+            patents: ldaDocuments,
+            num_topics: 5,
+          })
+          setLdaResult(ldaResponse)
+
+          updateStep("lda_analysis", {
+            status: "completed",
+            count: ldaResponse.num_topics,
+            message: `${ldaResponse.num_topics}개 토픽 추출 (coherence: ${ldaResponse.coherence_score.toFixed(3)})`,
+          })
+        } catch (err) {
+          updateStep("lda_analysis", {
+            status: "failed",
+            message: err instanceof Error ? err.message : "LDA 분석 실패",
+          })
+          throw err
+        }
+      } else {
+        updateStep("lda_analysis", {
+          status: "completed",
+          message: "특허 수 부족 (최소 3건 필요)",
+        })
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "파이프라인 실행 실패")
     } finally {
       setIsRunning(false)
     }
-  }, [description, maxPatents, numTopics, enableNoiseRemoval, customNoiseConfig])
+  }, [description, maxPatents, enableNoiseRemoval, customNoiseConfig])
 
-  // Convert pipeline result to format expected by LDAVisualization
-  const collectResult = result?.search_summary
+  // Re-run LDA with different topic count (without re-running entire pipeline)
+  const handleRerunLDA = useCallback(async () => {
+    if (filteredPatents.length === 0) {
+      setError("재분석할 특허가 없습니다.")
+      return
+    }
+
+    setIsRerunningLDA(true)
+    setError(null)
+
+    try {
+      const ldaDocuments = filteredPatents
+        .map((patent) => {
+          const textParts: string[] = []
+          if (patent.invention_name) textParts.push(patent.invention_name)
+          if (patent.abstract) textParts.push(patent.abstract)
+          return {
+            id: patent.application_number || `patent-${Math.random()}`,
+            text: textParts.join(" "),
+          }
+        })
+        .filter((doc) => doc.text.trim().length > 0)
+
+      const newLdaResult = await analyzeLDA({
+        patents: ldaDocuments,
+        num_topics: numTopics,
+      })
+
+      setLdaResult(newLdaResult)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "LDA 재분석 실패")
+    } finally {
+      setIsRerunningLDA(false)
+    }
+  }, [filteredPatents, numTopics])
+
+  // Check if pipeline has started (any step not pending)
+  const hasStarted = steps.some((s) => s.status !== "pending")
+
+  // Convert to format expected by LDAVisualization
+  const collectResult = searchSummary
     ? {
-        total: result.search_summary.total_found,
-        collected: result.noise_removal_summary?.output_count ?? result.search_summary.collected,
-        patents: [], // Visualization doesn't need full patent list
-        formula: result.search_summary.search_keywords.join(" "), // Keywords used for search
+        total: searchSummary.total,
+        collected: filteredPatents.length,
+        patents: filteredPatents,
+        formula: generatedKeywords.join(" "),
       }
     : null
 
@@ -225,14 +413,14 @@ export default function LDAPage() {
           animate={{ opacity: 1, y: 0 }}
           className="mb-6 rounded-lg border border-border bg-white p-6"
         >
-          <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold">
-            <Sparkles className="h-5 w-5 text-primary" />
+          <h2 className="mb-4 text-lg font-semibold">
             기술 설명 입력
           </h2>
 
           <div className="space-y-4">
             <div>
-              <label className="mb-2 block text-sm font-medium">
+              <label className="mb-2 flex items-center gap-2 text-sm font-medium">
+                <Sparkles className="h-4 w-4 text-primary" />
                 분석하고 싶은 기술을 자연어로 설명하세요
               </label>
               <textarea
@@ -257,20 +445,6 @@ export default function LDAPage() {
                   max={2000}
                   className="w-full rounded-lg border border-border p-3 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                 />
-              </div>
-
-              <div className="w-40">
-                <label className="mb-2 block text-sm font-medium">토픽 수</label>
-                <select
-                  value={numTopics}
-                  onChange={(e) => setNumTopics(e.target.value === "auto" ? "auto" : Number(e.target.value))}
-                  className="w-full rounded-lg border border-border p-3 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                >
-                  <option value="auto">자동 (최적화)</option>
-                  {[3, 5, 7, 10, 15, 20].map((n) => (
-                    <option key={n} value={n}>{n}개</option>
-                  ))}
-                </select>
               </div>
 
               <label className="flex cursor-pointer items-center gap-2">
@@ -305,6 +479,7 @@ export default function LDAPage() {
                     <NoiseConfigEditor
                       config={customNoiseConfig}
                       onChange={setCustomNoiseConfig}
+                      disabled={!enableNoiseRemoval}
                     />
                   ) : (
                     <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-center text-sm text-slate-500">
@@ -329,17 +504,14 @@ export default function LDAPage() {
                   분석 중...
                 </>
               ) : (
-                <>
-                  <Sparkles className="h-5 w-5" />
-                  분석 실행
-                </>
+                "분석 실행"
               )}
             </button>
           </div>
         </motion.div>
 
         {/* Pipeline Progress */}
-        {(isRunning || result) && (
+        {hasStarted && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -351,32 +523,17 @@ export default function LDAPage() {
             </h2>
 
             <div className="space-y-2">
-              {result?.steps.map((step, index) => (
-                <StepStatus
-                  key={step.step}
-                  step={step.step}
-                  status={step.status}
-                  count={step.count}
-                  message={step.message}
-                  isActive={isRunning && index === result.steps.length - 1}
-                />
+              {steps.map((stepState) => (
+                <StepStatus key={stepState.step} stepState={stepState} />
               ))}
-
-              {isRunning && (!result || result.steps.length === 0) && (
-                <StepStatus
-                  step="keyword_extraction"
-                  status="running"
-                  isActive={true}
-                />
-              )}
             </div>
 
             {/* Generated Keywords Preview */}
-            {result?.generated_keywords && result.generated_keywords.length > 0 && (
+            {generatedKeywords.length > 0 && (
               <div className="mt-4 rounded-lg bg-slate-50 p-4">
                 <h3 className="mb-2 text-sm font-semibold text-slate-700">AI 생성 키워드</h3>
                 <div className="flex flex-wrap gap-2">
-                  {result.generated_keywords.map((kw) => (
+                  {generatedKeywords.map((kw) => (
                     <span
                       key={kw}
                       className="rounded-full bg-blue-100 px-3 py-1 text-sm text-blue-800"
@@ -398,20 +555,59 @@ export default function LDAPage() {
         )}
 
         {/* Results - LDA Visualization */}
-        {result?.lda_result && collectResult && (
+        {ldaResult && collectResult && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
           >
+            {/* Topic Count Adjustment */}
+            <div className="mb-4 flex items-center justify-between rounded-lg border border-border bg-white p-4">
+              <div className="flex items-center gap-4">
+                <label className="text-sm font-medium">토픽 수 조정:</label>
+                <select
+                  value={numTopics}
+                  onChange={(e) => setNumTopics(Number(e.target.value))}
+                  className="rounded-lg border border-border px-3 py-2 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  disabled={isRerunningLDA}
+                >
+                  {[3, 5, 7, 10, 15, 20].map((n) => (
+                    <option key={n} value={n}>
+                      {n}개
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={handleRerunLDA}
+                  disabled={isRerunningLDA || filteredPatents.length === 0}
+                  className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-all hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isRerunningLDA ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      재분석 중...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="h-4 w-4" />
+                      토픽 재분석
+                    </>
+                  )}
+                </button>
+              </div>
+              <div className="text-sm text-text-muted">
+                분석 대상: {filteredPatents.length}건
+              </div>
+            </div>
+
             <LDAVisualization
-              ldaResult={result.lda_result}
+              ldaResult={ldaResult}
               collectResult={collectResult}
             />
           </motion.div>
         )}
 
         {/* Empty State */}
-        {!result && !isRunning && (
+        {!hasStarted && !isRunning && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <Sparkles className="mb-4 h-16 w-16 text-text-muted/50" />
             <h2 className="text-xl font-semibold text-text-muted">

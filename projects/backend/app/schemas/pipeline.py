@@ -5,8 +5,9 @@ Pipeline flow: Natural Language → Keywords/IPC → Search → Noise Removal �
 
 from pydantic import BaseModel, Field
 
+from kipris.models import FreeSearchResult
 from app.schemas.lda import LDAResponse
-from app.schemas.noise_removal import ExcludedSummary, NoiseRemovalConfig
+from app.schemas.noise_removal import NoiseRemovalConfig, NoiseRemovalSummary
 
 
 class PipelineRequest(BaseModel):
@@ -58,15 +59,6 @@ class SearchResultSummary(BaseModel):
     )
 
 
-class NoiseRemovalSummary(BaseModel):
-    """Summary of noise removal results."""
-
-    input_count: int
-    output_count: int
-    excluded_summary: ExcludedSummary
-    config_used: NoiseRemovalConfig
-
-
 class PipelineResponse(BaseModel):
     """Response from unified analysis pipeline."""
 
@@ -95,6 +87,10 @@ class PipelineResponse(BaseModel):
     )
     noise_removal_summary: NoiseRemovalSummary | None = Field(
         default=None, description="Noise removal summary"
+    )
+    filtered_patents: list[FreeSearchResult] = Field(
+        default_factory=list,
+        description="Patents after noise removal (for LDA re-run with different topic count)",
     )
     lda_result: LDAResponse | None = Field(
         default=None, description="LDA analysis results"

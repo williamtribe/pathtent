@@ -755,31 +755,18 @@ export interface FreeSearchResult {
 }
 
 export interface NoiseRemovalConfig {
-  main_category: string
-  sub_categories: string[]
-  include_ipc: string[]
-  exclude_ipc: string[]
-  required_keywords: string[]
-  exclude_keywords: string[]
-  use_embedding_filter: boolean
+  embedding_query: string
   embedding_threshold: number
 }
 
 export interface ExcludedSummary {
   duplicate: number
-  ipc_excluded: number
-  ipc_not_included: number
-  keyword_missing: number
-  keyword_excluded: number
   low_similarity: number
 }
 
 export interface NoiseRemovalResult {
   input_count: number
-  step1_count: number
-  step2_count: number
-  step3_count: number
-  step4_count: number | null
+  after_dedup_count: number
   final_count: number
   valid_patents: FreeSearchResult[]
   excluded_summary: ExcludedSummary
@@ -796,12 +783,50 @@ export interface NoiseRemovalResponse {
 }
 
 /**
- * Process patents through the 4-step noise removal pipeline
+ * Process patents through the 2-step noise removal pipeline
  */
 export async function processNoiseRemoval(
   request: NoiseRemovalRequest
 ): Promise<NoiseRemovalResponse> {
   const response = await fetch(`${API_BASE_URL}/api/v1/noise-removal/process`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(request),
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: "Unknown error" }))
+    throw new Error(error.detail || `HTTP ${response.status}`)
+  }
+
+  return response.json()
+}
+
+// ============================================================================
+// KIPRIS Direct Search API
+// ============================================================================
+
+export interface KIPRISSearchRequest {
+  keywords: string[]
+  max_results?: number
+}
+
+export interface KIPRISSearchResponse {
+  patents: FreeSearchResult[]
+  total_found: number
+  collected: number
+  search_query: string
+}
+
+/**
+ * Search KIPRIS directly using keywords
+ */
+export async function searchKIPRIS(
+  request: KIPRISSearchRequest
+): Promise<KIPRISSearchResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/kipris/search`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -844,9 +869,10 @@ export interface SearchResultSummary {
 
 export interface NoiseRemovalSummary {
   input_count: number
+  after_dedup_count: number
   output_count: number
-  excluded_summary: ExcludedSummary
-  config_used: NoiseRemovalConfig
+  duplicate_removed: number
+  low_similarity_removed: number
 }
 
 export interface PipelineResponse {
@@ -857,6 +883,7 @@ export interface PipelineResponse {
   generated_noise_config: NoiseRemovalConfig | null
   search_summary: SearchResultSummary | null
   noise_removal_summary: NoiseRemovalSummary | null
+  filtered_patents: FreeSearchResult[]
   lda_result: LDAResponse | null
   error: string | null
 }

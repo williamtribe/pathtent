@@ -1,10 +1,8 @@
 """Noise removal schemas for patent filtering pipeline.
 
-4-step pipeline:
+2-step pipeline:
 1. Duplicate removal (by application_number)
-2. IPC code filtering (include/exclude patterns)
-3. Keyword matching (OR logic, case-insensitive, partial match)
-4. Embedding filtering (optional, for ambiguous cases)
+2. Embedding similarity filtering (batch processing)
 """
 
 from pydantic import BaseModel, Field
@@ -15,49 +13,16 @@ from kipris.models import FreeSearchResult
 class NoiseRemovalConfig(BaseModel):
     """Configuration for noise removal pipeline."""
 
-    # Category definition
-    main_category: str = Field(
-        ..., description="Main category (e.g., 'Display Sensor Technology')"
-    )
-    sub_categories: list[str] = Field(
-        default_factory=list,
-        description="Sub categories (e.g., ['touch', 'pressure', 'fingerprint'])",
-    )
-
-    # IPC filtering (step 2)
-    include_ipc: list[str] = Field(
-        default_factory=list,
-        description="IPC patterns to include (e.g., ['G06F-003*', 'G06K-009*']). Wildcard * supported.",
-    )
-    exclude_ipc: list[str] = Field(
-        default_factory=list,
-        description="IPC patterns to exclude (e.g., ['E04*', 'B23K*']). Wildcard * supported.",
-    )
-
-    # Keyword filtering (step 3) - OR logic
-    required_keywords: list[str] = Field(
-        default_factory=list,
-        description="Keywords to match (OR logic). Patent kept if ANY keyword found in title/abstract. "
-        "Include variations and common typos (e.g., ['display', 'Display', 'display panel', 'sensor']).",
-    )
-    exclude_keywords: list[str] = Field(
-        default_factory=list,
-        description="Keywords to exclude. Patent removed if ANY found (e.g., ['concrete', 'welding']).",
-    )
-
-    # Embedding filtering (step 4) - optional
-    use_embedding_filter: bool = Field(
-        default=False, description="Enable embedding-based similarity filtering"
+    # Query for embedding similarity
+    embedding_query: str = Field(
+        ...,
+        description="Query text for embedding similarity (user's technology description)",
     )
     embedding_threshold: float = Field(
         default=0.5,
         ge=0.0,
         le=1.0,
-        description="Minimum similarity score for embedding filter",
-    )
-    embedding_query: str | None = Field(
-        default=None,
-        description="Query text for embedding similarity. Defaults to main_category if not provided.",
+        description="Minimum cosine similarity score (0.0-1.0). Higher = stricter filtering.",
     )
 
 
@@ -66,15 +31,18 @@ class ExcludedPatent(BaseModel):
 
     patent: FreeSearchResult
     excluded_at_step: int = Field(
-        ..., ge=1, le=4, description="Step number where excluded (1-4)"
+        ...,
+        ge=1,
+        le=2,
+        description="Step number where excluded (1=duplicate, 2=low_similarity)",
     )
     reason: str = Field(
         ...,
-        description="Exclusion reason: 'duplicate', 'ipc_excluded', 'ipc_not_included', "
-        "'keyword_missing', 'keyword_excluded', 'low_similarity'",
+        description="Exclusion reason: 'duplicate' or 'low_similarity'",
     )
-    detail: str | None = Field(
-        default=None, description="Additional detail (e.g., matched exclude keyword)"
+    similarity_score: float | None = Field(
+        default=None,
+        description="Similarity score (only for low_similarity exclusions)",
     )
 
 
@@ -83,18 +51,6 @@ class ExcludedSummary(BaseModel):
 
     duplicate: int = Field(
         default=0, description="Count excluded for duplicate application_number"
-    )
-    ipc_excluded: int = Field(
-        default=0, description="Count excluded for matching exclude_ipc pattern"
-    )
-    ipc_not_included: int = Field(
-        default=0, description="Count excluded for not matching any include_ipc pattern"
-    )
-    keyword_missing: int = Field(
-        default=0, description="Count excluded for missing all required keywords"
-    )
-    keyword_excluded: int = Field(
-        default=0, description="Count excluded for matching an exclude keyword"
     )
     low_similarity: int = Field(
         default=0, description="Count excluded for low embedding similarity"
@@ -106,13 +62,8 @@ class NoiseRemovalResult(BaseModel):
 
     # Counts at each step
     input_count: int = Field(..., description="Total patents received as input")
-    step1_count: int = Field(..., description="Count after duplicate removal")
-    step2_count: int = Field(..., description="Count after IPC filtering")
-    step3_count: int = Field(..., description="Count after keyword matching")
-    step4_count: int | None = Field(
-        default=None, description="Count after embedding filtering (null if not used)"
-    )
-    final_count: int = Field(..., description="Final valid patent count")
+    after_dedup_count: int = Field(..., description="Count after duplicate removal")
+    final_count: int = Field(..., description="Final count after embedding filtering")
 
     # Results
     valid_patents: list[FreeSearchResult] = Field(
@@ -138,3 +89,14 @@ class NoiseRemovalResponse(BaseModel):
         default=None,
         description="List of excluded patents with reasons (only if include_excluded=true in request)",
     )
+
+
+# Pipeline integration types
+class NoiseRemovalSummary(BaseModel):
+    """Summary for pipeline response."""
+
+    input_count: int
+    after_dedup_count: int
+    output_count: int
+    duplicate_removed: int
+    low_similarity_removed: int

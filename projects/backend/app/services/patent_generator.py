@@ -1,11 +1,7 @@
-"""Patent specification generation service using Gemini AI."""
+"""Patent specification generation service using LLM (multi-provider support)."""
 
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent
-from pydantic_ai.models.google import GoogleModel
-from pydantic_ai.providers.google import GoogleProvider
-
-from app.config import Settings
 
 
 # ============================================================================
@@ -67,9 +63,7 @@ class QuestionItem(BaseModel):
         ..., description="카테고리: 기술, 배경, 효과, 적용분야, 청구항"
     )
     hint: str = Field(..., description="답변 힌트 또는 예시")
-    choices: list[str] | None = Field(
-        None, description="객관식 선택지 (없으면 주관식)"
-    )
+    choices: list[str] | None = Field(None, description="객관식 선택지 (없으면 주관식)")
 
 
 class QuestionGenerationResult(BaseModel):
@@ -166,9 +160,9 @@ class _QuestionAgentSingleton:
 
     @classmethod
     def _create(cls) -> Agent[None, QuestionGenerationResult]:
-        settings = Settings()
-        provider = GoogleProvider(api_key=settings.google_api_key)
-        model = GoogleModel(settings.gemini_model, provider=provider)
+        from app.services.llm_factory import get_model
+
+        model = get_model()
         return Agent(
             model=model,
             output_type=QuestionGenerationResult,
@@ -187,9 +181,9 @@ class _PatentAgentSingleton:
 
     @classmethod
     def _create(cls) -> Agent[None, PatentSpecificationResult]:
-        settings = Settings()
-        provider = GoogleProvider(api_key=settings.google_api_key)
-        model = GoogleModel(settings.gemini_model, provider=provider)
+        from app.services.llm_factory import get_model
+
+        model = get_model()
         return Agent(
             model=model,
             output_type=PatentSpecificationResult,

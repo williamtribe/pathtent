@@ -1,11 +1,8 @@
-"""Chat-based patent specification refinement service."""
+"""Chat-based patent specification refinement service (multi-provider support)."""
 
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent
-from pydantic_ai.models.google import GoogleModel
-from pydantic_ai.providers.google import GoogleProvider
 
-from app.config import Settings
 from app.services.patent_generator import (
     ClaimItem,
     PatentSpecificationResult,
@@ -73,9 +70,9 @@ class _ChatRefinerSingleton:
 
     @classmethod
     def _create(cls) -> Agent[ChatRefinementInput, ChatRefinementResult]:
-        settings = Settings()
-        provider = GoogleProvider(api_key=settings.google_api_key)
-        model = GoogleModel(settings.gemini_model, provider=provider)
+        from app.services.llm_factory import get_model
+
+        model = get_model()
         return Agent(
             model=model,
             output_type=ChatRefinementResult,

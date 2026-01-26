@@ -1,9 +1,5 @@
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, ModelRetry, RunContext
-from pydantic_ai.models.google import GoogleModel
-from pydantic_ai.providers.google import GoogleProvider
-
-from app.config import Settings
 
 MULTI_QUERY_SYSTEM_PROMPT = """
 <goal>
@@ -59,7 +55,9 @@ class KIPRISSearchQuery(BaseModel):
 
     word: str = Field(description="핵심 검색 키워드 (필수)")
     ipc_number: str | None = Field(None, description="IPC 분류 코드 (선택)")
-    perspective: str | None = Field(None, description="쿼리 관점 (core/domain/method/application)")
+    perspective: str | None = Field(
+        None, description="쿼리 관점 (core/domain/method/application)"
+    )
 
 
 class KIPRISMultiQuery(BaseModel):
@@ -79,9 +77,9 @@ class _MultiQueryAgentSingleton:
 
     @classmethod
     def _create(cls) -> Agent[None, KIPRISMultiQuery]:
-        settings = Settings()
-        provider = GoogleProvider(api_key=settings.google_api_key)
-        model = GoogleModel(settings.gemini_model, provider=provider)
+        from app.services.llm_factory import get_model
+
+        model = get_model()
         agent = Agent(
             model=model,
             output_type=KIPRISMultiQuery,
@@ -89,14 +87,20 @@ class _MultiQueryAgentSingleton:
         )
 
         @agent.output_validator
-        async def validate_queries(ctx: RunContext[None], result: KIPRISMultiQuery) -> KIPRISMultiQuery:
+        async def validate_queries(
+            ctx: RunContext[None], result: KIPRISMultiQuery
+        ) -> KIPRISMultiQuery:
             if len(result.queries) < 3:
-                raise ModelRetry("최소 3개의 검색 쿼리가 필요합니다. 다양한 관점에서 쿼리를 생성하세요.")
+                raise ModelRetry(
+                    "최소 3개의 검색 쿼리가 필요합니다. 다양한 관점에서 쿼리를 생성하세요."
+                )
             if len(result.queries) > 5:
                 result.queries = result.queries[:5]
             for query in result.queries:
                 if len(query.word) < 2:
-                    raise ModelRetry(f"검색어 '{query.word}'가 너무 짧습니다. 핵심 기술 용어를 사용하세요.")
+                    raise ModelRetry(
+                        f"검색어 '{query.word}'가 너무 짧습니다. 핵심 기술 용어를 사용하세요."
+                    )
             return result
 
         return agent
@@ -136,4 +140,8 @@ async def generate_search_query(text: str) -> KIPRISSearchQuery:
         KIPRISSearchQuery with optimized search keywords
     """
     queries = await generate_search_queries(text)
-    return queries[0] if queries else KIPRISSearchQuery(word="", ipc_number=None, perspective=None)
+    return (
+        queries[0]
+        if queries
+        else KIPRISSearchQuery(word="", ipc_number=None, perspective=None)
+    )

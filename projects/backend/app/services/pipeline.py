@@ -21,6 +21,7 @@ from app.schemas.pipeline import (
     PipelineStepResult,
     SearchResultSummary,
 )
+from app.services.embedding import GeminiEmbeddingService
 from app.services.formula_generator import generate_formula
 from app.services.lda_analyzer import LDAAnalyzer
 from app.services.noise_removal import NoiseRemovalService
@@ -30,58 +31,22 @@ logger = logging.getLogger(__name__)
 
 def generate_noise_config_from_formula(
     description: str,
-    keywords: list[str],
-    synonyms: dict[str, list[str]],
-    ipc_codes: list[str],
-    excluded_terms: list[str],
+    embedding_threshold: float = 0.5,
 ) -> NoiseRemovalConfig:
-    """Generate NoiseRemovalConfig from formula generation output.
+    """Generate NoiseRemovalConfig from user description.
+
+    Uses embedding similarity for filtering - simple and effective.
 
     Args:
-        description: Original natural language description
-        keywords: Core keywords from formula generation
-        synonyms: Synonym mappings
-        ipc_codes: IPC codes (format: "B60L: description...")
-        excluded_terms: Terms to exclude
+        description: Original natural language description (used as embedding query)
+        embedding_threshold: Minimum cosine similarity (0.0-1.0)
 
     Returns:
         NoiseRemovalConfig ready for noise removal
     """
-    # Flatten all keywords and synonyms for required_keywords (OR logic)
-    required_keywords: list[str] = []
-    for kw in keywords:
-        required_keywords.append(kw)
-    for kw, syns in synonyms.items():
-        required_keywords.extend(syns)
-
-    # Remove duplicates while preserving order
-    seen: set[str] = set()
-    unique_keywords: list[str] = []
-    for kw in required_keywords:
-        kw_lower = kw.lower()
-        if kw_lower not in seen:
-            seen.add(kw_lower)
-            unique_keywords.append(kw)
-
-    # Extract raw IPC codes for filtering (e.g., "B60L" from "B60L: Electric...")
-    include_ipc: list[str] = []
-    for ipc in ipc_codes:
-        if ":" in ipc:
-            code = ipc.split(":")[0].strip().replace(" ", "")
-            # Add wildcard for subclass matching
-            include_ipc.append(f"{code}*")
-        else:
-            include_ipc.append(f"{ipc.replace(' ', '')}*")
-
     return NoiseRemovalConfig(
-        main_category=description[:100],  # Truncate if too long
-        sub_categories=keywords[:5],  # First 5 keywords as sub-categories
-        include_ipc=include_ipc,
-        exclude_ipc=[],  # User can add later
-        required_keywords=unique_keywords,
-        exclude_keywords=excluded_terms,
-        use_embedding_filter=False,  # Off by default, user can enable
-        embedding_threshold=0.5,
+        embedding_query=description,
+        embedding_threshold=embedding_threshold,
     )
 
 
@@ -139,10 +104,6 @@ async def run_pipeline(request: PipelineRequest) -> PipelineResponse:
         response.generated_ipc_codes = formula_result.ipc_codes
         response.generated_noise_config = generate_noise_config_from_formula(
             description=request.description,
-            keywords=formula_result.keywords,
-            synonyms=formula_result.synonyms,
-            ipc_codes=formula_result.ipc_codes,
-            excluded_terms=formula_result.excluded_terms,
         )
 
         steps.append(
@@ -261,16 +222,21 @@ async def run_pipeline(request: PipelineRequest) -> PipelineResponse:
                 raise ValueError("No noise removal config available")
 
             logger.info(f"Step 3: Applying noise removal to {len(patents)} patents")
-            noise_service = NoiseRemovalService()
+            google_api_key = settings.google_api_key
+            if not google_api_key:
+                raise ValueError("GOOGLE_API_KEY not configured for embedding service")
+            embedding_service = GeminiEmbeddingService(api_key=google_api_key)
+            noise_service = NoiseRemovalService(embedding_service=embedding_service)
             noise_result, _excluded = await noise_service.process(patents, noise_config)
 
             filtered_patents = noise_result.valid_patents
 
             response.noise_removal_summary = NoiseRemovalSummary(
                 input_count=noise_result.input_count,
+                after_dedup_count=noise_result.after_dedup_count,
                 output_count=noise_result.final_count,
-                excluded_summary=noise_result.excluded_summary,
-                config_used=noise_config,
+                duplicate_removed=noise_result.excluded_summary.duplicate,
+                low_similarity_removed=noise_result.excluded_summary.low_similarity,
             )
 
             steps.append(
@@ -386,4 +352,5 @@ async def run_pipeline(request: PipelineRequest) -> PipelineResponse:
         )
 
     response.steps = steps
+    response.filtered_patents = filtered_patents
     return response

@@ -419,8 +419,8 @@ export function LDAVisualization({
                         {idx + 1}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="font-medium text-text">
-                          {doc.patent?.title || doc.patent_id}
+<p className="font-medium text-text">
+                          {doc.patent?.invention_name || doc.patent_id}
                         </p>
                         <p className="mt-1 text-sm text-text-muted">
                           {doc.patent_id}

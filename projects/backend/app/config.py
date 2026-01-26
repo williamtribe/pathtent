@@ -1,11 +1,24 @@
+from typing import Literal
+
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    # 필수: AI API 키
-    google_api_key: str
+    # LLM Provider 선택: "google" | "anthropic" | "openai"
+    llm_provider: Literal["google", "anthropic", "openai"] = "anthropic"
+
+    # Google (Gemini)
+    google_api_key: str | None = None
     gemini_model: str = "gemini-2.0-flash-exp"
-    gemini_embedding_model: str = "text-embedding-004"
+    gemini_embedding_model: str = "gemini-embedding-001"
+
+    # Anthropic (Claude) - Default provider
+    anthropic_api_key: str | None = None
+    anthropic_model: str = "claude-haiku-4-5"
+
+    # OpenAI (GPT)
+    openai_api_key: str | None = None
+    openai_model: str = "gpt-4o"
 
     # 선택: KIPRIS API (특허 검색 기능 사용 시)
     kipris_service_key: str | None = None

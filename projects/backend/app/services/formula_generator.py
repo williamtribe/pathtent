@@ -7,8 +7,7 @@ and FormulaBuilder for rule-based formula construction.
 
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, ModelRetry, RunContext
-from pydantic_ai.models.google import GoogleModel
-from pydantic_ai.providers.google import GoogleProvider
+
 
 from app.config import Settings
 from app.schemas.formula import (
@@ -320,13 +319,14 @@ class _FormulaGenerateAgentSingleton:
 
     @classmethod
     def _create(cls) -> Agent[None, AIFormulaOutput]:
-        settings = Settings()
-        provider = GoogleProvider(api_key=settings.google_api_key)
-        model = GoogleModel(settings.gemini_model, provider=provider)
+        from app.services.llm_factory import get_model
+
+        model = get_model()
         agent = Agent(
             model=model,
             output_type=AIFormulaOutput,
             system_prompt=FORMULA_GENERATE_PROMPT,
+            retries=3,  # Allow more retries for output validation
         )
 
         @agent.output_validator
@@ -344,6 +344,36 @@ class _FormulaGenerateAgentSingleton:
                 raise ModelRetry(
                     "Provide synonyms for each keyword. Missing synonym mappings."
                 )
+
+            # Validate synonyms are short terms, not sentences
+            # Max 50 chars per synonym, no explanatory text
+            for kw, syns in result.synonyms.items():
+                for syn in syns:
+                    if len(syn) > 50:
+                        raise ModelRetry(
+                            f"Synonym '{syn[:40]}...' is too long. "
+                            "Each synonym must be a single word or short term (max 50 chars), "
+                            "NOT a sentence or explanation. Remove tips from synonyms."
+                        )
+                    # Check for explanatory patterns
+                    if any(
+                        phrase in syn.lower()
+                        for phrase in [
+                            "추가하",
+                            "검색",
+                            "좁힐",
+                            "포함",
+                            "고려",
+                            "권장",
+                            "좋습니다",
+                            "수 있습니다",
+                            "하세요",
+                        ]
+                    ):
+                        raise ModelRetry(
+                            f"Synonym '{syn}' appears to be a tip/recommendation, not a keyword. "
+                            "Move recommendations to 'tips' field. Synonyms must be single terms only."
+                        )
 
             return result
 
@@ -363,9 +393,9 @@ class _FormulaImproveAgentSingleton:
 
     @classmethod
     def _create(cls) -> Agent[None, AIFormulaOutput]:
-        settings = Settings()
-        provider = GoogleProvider(api_key=settings.google_api_key)
-        model = GoogleModel(settings.gemini_model, provider=provider)
+        from app.services.llm_factory import get_model
+
+        model = get_model()
         agent = Agent(
             model=model,
             output_type=AIFormulaOutput,
@@ -399,9 +429,9 @@ class _FormulaCategoryAgentSingleton:
 
     @classmethod
     def _create(cls) -> Agent[None, AICategoryOutput]:
-        settings = Settings()
-        provider = GoogleProvider(api_key=settings.google_api_key)
-        model = GoogleModel(settings.gemini_model, provider=provider)
+        from app.services.llm_factory import get_model
+
+        model = get_model()
         agent = Agent(
             model=model,
             output_type=AICategoryOutput,

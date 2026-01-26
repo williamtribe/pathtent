@@ -86,7 +86,7 @@ class IPCInfo(BaseModel):
 class IPCSearchParams(BaseModel):
     ipc_number: str = Field(..., alias="ipcNumber")
     docs_start: int = Field(1, alias="docsStart")
-    docs_count: int = Field(30, alias="docsCount")
+    docs_count: int = Field(500, alias="docsCount")
     patent: bool | None = Field(None, alias="patent")
     utility: bool | None = Field(None, alias="utility")
     last_value: Literal["", "A", "C", "F", "G", "I", "J", "R"] | None = Field(
@@ -132,7 +132,7 @@ class IPCSearchResponse(BaseModel):
 class FreeSearchParams(BaseModel):
     word: str = Field(..., alias="word")
     docs_start: int = Field(1, alias="docsStart")
-    docs_count: int = Field(30, alias="docsCount")
+    docs_count: int = Field(500, alias="docsCount")
     patent: bool | None = Field(None, alias="patent")
     utility: bool | None = Field(None, alias="utility")
     last_value: Literal["", "A", "C", "F", "G", "I", "J", "R"] | None = Field(
