@@ -47,17 +47,20 @@ async def search_kipris(request: KIPRISSearchRequest) -> KIPRISSearchResponse:
         raise HTTPException(status_code=500, detail="KIPRIS_SERVICE_KEY not configured")
 
     # Build search query (space-separated = OR logic)
-    # Remove wildcards (*) - KIPRIS may not support them
+    # Clean keywords: remove wildcards, filter valid ones
     cleaned_keywords = []
     for kw in request.keywords:
         if kw and kw.strip():
             cleaned = kw.rstrip("*").strip()
-            if cleaned:  # Skip empty strings after removing wildcards
+            # Skip empty, skip keywords with spaces (would break OR logic)
+            if cleaned and " " not in cleaned:
                 cleaned_keywords.append(cleaned)
+
     # Deduplicate while preserving order
     unique_keywords = list(dict.fromkeys(cleaned_keywords))
-    # Use up to 15 keywords (Korean + English)
-    search_query = " ".join(unique_keywords[:15])
+
+    # Use top 5 keywords only (too many keywords = poor results)
+    search_query = " ".join(unique_keywords[:5])
 
     if not search_query:
         raise HTTPException(status_code=400, detail="No valid keywords provided")
