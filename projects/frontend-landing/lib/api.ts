@@ -331,6 +331,8 @@ export interface FormulaBlock {
   field: string // TAC, TI, AB, CL, IPC
   keywords: string[]
   operator: string // OR, AND
+  ipc_codes: string[] // Per-category IPC codes from embedding search
+  enabled: boolean // Whether this block is included in the formula
 }
 
 export interface FormulaBlocksResponse {
@@ -670,6 +672,8 @@ export interface SNAParams {
   startYear?: number
   endYear?: number
   includeYearly?: boolean
+  enableFilter?: boolean
+  minSimilarity?: number
 }
 
 // ============================================================================
@@ -689,6 +693,12 @@ export async function analyzeSNA(params: SNAParams): Promise<SNAResult> {
   }
   if (params.endYear) {
     searchParams.set('end_year', params.endYear.toString())
+  }
+  if (params.enableFilter !== undefined) {
+    searchParams.set('enable_filter', params.enableFilter.toString())
+  }
+  if (params.minSimilarity !== undefined) {
+    searchParams.set('min_similarity', params.minSimilarity.toString())
   }
 
   const response = await fetch(`${API_BASE_URL}/api/v1/patent/sna/free?${searchParams}`)

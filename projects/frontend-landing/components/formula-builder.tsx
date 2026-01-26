@@ -7,11 +7,6 @@ import { FormulaBlockComponent } from "./formula-block"
 import type { FormulaBlock, FormulaBlocksResponse } from "../lib/api"
 import { assembleFormula } from "../lib/api"
 
-const BLOCK_OPERATOR_OPTIONS = [
-  { value: "AND", label: "AND" },
-  { value: "OR", label: "OR" },
-]
-
 interface FormulaBuilderProps {
   initialData: FormulaBlocksResponse
   onFormulaChange?: (formula: string) => void
@@ -81,13 +76,15 @@ export function FormulaBuilder({ initialData, onFormulaChange }: FormulaBuilderP
     setBlockOperators((prev) => prev.map((op, i) => (i === index ? value : op)))
   }
 
-  const handleAddBlock = () => {
+   const handleAddBlock = () => {
     const newBlock: FormulaBlock = {
       id: `block-${Date.now()}`,
       name: `Block ${blocks.length + 1}`,
       field: "TAC",
       keywords: [],
       operator: "OR",
+      ipc_codes: [], // New blocks have no IPC codes by default
+      enabled: true, // New blocks are enabled by default
     }
     setBlocks((prev) => [...prev, newBlock])
     // Add operator between previous last block and new block
@@ -119,23 +116,37 @@ export function FormulaBuilder({ initialData, onFormulaChange }: FormulaBuilderP
               canDelete={blocks.length > 1}
             />
 
-            {/* Operator between blocks */}
+            {/* Operator between blocks - Pill Toggle */}
             {index < blocks.length - 1 && (
               <motion.div
                 layout
-                className="flex items-center justify-center py-2"
+                className="relative flex items-center justify-center py-4"
               >
-                <select
-                  value={blockOperators[index] || "AND"}
-                  onChange={(e) => handleOperatorChange(index, e.target.value)}
-                  className="rounded-lg border border-border bg-white px-4 py-2 text-sm font-medium text-text shadow-sm hover:bg-surface"
+                {/* Vertical connector line through entire section */}
+                <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-border" />
+                
+                {/* Pill button centered */}
+                <motion.button
+                  onClick={() =>
+                    handleOperatorChange(
+                      index,
+                      blockOperators[index] === "AND" ? "OR" : "AND"
+                    )
+                  }
+                  className="relative z-10"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                 >
-                  {BLOCK_OPERATOR_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
+                  <div
+                    className={`rounded-full px-5 py-1.5 text-sm font-semibold shadow-md transition-all ${
+                      blockOperators[index] === "AND"
+                        ? "bg-primary text-white hover:bg-primary/90"
+                        : "bg-amber-500 text-white hover:bg-amber-600"
+                    }`}
+                  >
+                    {blockOperators[index] || "AND"}
+                  </div>
+                </motion.button>
               </motion.div>
             )}
           </motion.div>

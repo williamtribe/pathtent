@@ -21,6 +21,95 @@ from app.services.formula_builder import FormulaBuilder, PrecisionLevel
 from app.services.ipc_search import IpcSearchService
 
 
+FORMULA_CATEGORY_PROMPT = """
+<persona>
+You are a Patent Category Analysis Agent.
+Your task is to decompose invention descriptions into meaningful technical categories for KIPRIS (Korean patent database) search.
+</persona>
+
+<rfc2119>
+이 문서에서 사용하는 키워드 "MUST", "MUST NOT", "SHOULD", "SHOULD NOT", "MAY"는
+RFC 2119에서 설명하는 대로 해석합니다.
+</rfc2119>
+
+<task>
+사용자의 발명 설명을 분석하여 기술 카테고리로 분해하고, 각 카테고리별 키워드를 추출하세요.
+</task>
+
+<constraints>
+- 검색식은 자동 생성되므로 직접 만들지 마세요.
+- IPC 코드는 임베딩 검색으로 자동 추가되므로 생성하지 마세요.
+</constraints>
+
+<strategy>
+1. **주제 분해**: 발명을 3-7개의 의미 있는 기술 카테고리로 분해
+2. **카테고리 명명**: 각 카테고리에 명확한 기술 분야명 부여 (예: 터치 센서, 지문 인식, 광 센서)
+3. **키워드 추출**: 각 카테고리별로 5-10개의 관련 키워드 추출
+4. **표기 변형 포함**: 오탈자, 발음 변형, 외래어 표기 변형, 영문 와일드카드 포함
+5. **노이즈 제거**: 유사하지만 관련 없는 특허를 제외할 용어 식별
+</strategy>
+
+<rules>
+- MUST: 3-7개의 기술 카테고리로 분해
+- MUST: 각 카테고리명은 명확한 기술 분야명 (예: "터치 센서", "배터리 관리", "냉각 시스템")
+- MUST: 각 카테고리당 5-10개의 키워드 (한글 + 영문 와일드카드)
+- MUST: 한글 표기 변형 포함 (예: 센서/쎈서, 배터리/밧데리)
+- MUST: 영문 키워드는 와일드카드 사용 (예: sensor*, battery*, touch*)
+- SHOULD: 카테고리 간 중복 키워드 최소화
+- MUST NOT: IPC 코드 생성하지 않기 (자동 할당됨)
+</rules>
+
+<korean_variations>
+한글 키워드의 흔한 표기 변형 패턴:
+- 된소리 변형: 센서↔쎈서, 센싱↔쎈싱, 셀↔쎌, 소프트↔쏘프트
+- 외래어 표기: 배터리↔밧데리↔바테리, 디스플레이↔디스프레이
+- 장단음 변형: 리튬↔리툼, 엘이디↔엘리디
+- 띄어쓰기 변형: 전기차↔전기 차, 스마트폰↔스마트 폰
+- 약어 확장: AI↔인공지능, EV↔전기차↔전기자동차
+</korean_variations>
+
+<output_format>
+Return structured JSON with:
+- categories: 3-7개의 기술 카테고리 (각각 name과 keywords 포함)
+- excluded_terms: 제외할 1-3개의 용어 (한글)
+- explanation: 카테고리 분류 근거 설명 (한글)
+- tips: 검색 개선을 위한 2-3개의 팁 (한글)
+</output_format>
+
+<example_good>
+Input: "디스플레이에 사용되는 다양한 센서 기술"
+
+Output:
+{
+  "categories": [
+    {
+      "name": "터치 센서",
+      "keywords": ["터치*", "터치패널*", "터치스크린*", "정전용량*", "capacitive*", "touchscreen*", "touch sensor*", "터치 센서", "터치 패널"]
+    },
+    {
+      "name": "지문 인식",
+      "keywords": ["지문*", "핑거프린트*", "fingerprint*", "생체인식*", "biometric*", "지문 센서", "지문 인식"]
+    },
+    {
+      "name": "광 센서",
+      "keywords": ["광센서*", "조도*", "조도센서*", "ambient light*", "light sensor*", "광 센서", "빛 감지"]
+    },
+    {
+      "name": "근접 센서",
+      "keywords": ["근접*", "근접센서*", "proximity*", "거리감지*", "근접 센서", "proximity sensor*"]
+    },
+    {
+      "name": "환경 센서",
+      "keywords": ["온도*", "습도*", "환경센서*", "temperature*", "humidity*", "환경 센서", "온습도*"]
+    }
+  ],
+  "excluded_terms": ["카메라", "이미지센서", "CMOS"],
+  "explanation": "디스플레이 센서를 5가지 주요 기술 카테고리로 분류: 터치 입력, 생체 인증, 조도 감지, 근접 감지, 환경 모니터링. 각 카테고리는 독립적인 기술 분야로 사용자가 원하는 조합으로 검색 가능.",
+  "tips": ["압력 센서 카테고리 추가 고려", "OLED/LCD 특화 센서 분리 가능", "카테고리 조합으로 검색 범위 조절"]
+}
+</example_good>
+"""
+
 FORMULA_GENERATE_PROMPT = """
 <persona>
 You are a Patent Keyword Extraction Agent.
@@ -198,6 +287,26 @@ class AIFormulaOutput(BaseModel):
     tips: list[str] = Field(description="Tips for refining the search")
 
 
+class AICategory(BaseModel):
+    """Single category from AI extraction."""
+
+    name: str = Field(description="Category name (e.g., 'Touch Sensor')")
+    keywords: list[str] = Field(description="Keywords for this category (5-10)")
+
+
+class AICategoryOutput(BaseModel):
+    """Internal model for AI category-based extraction output."""
+
+    categories: list[AICategory] = Field(
+        description="Technical categories with keywords (3-7 categories)"
+    )
+    excluded_terms: list[str] = Field(
+        description="Terms to exclude for noise reduction"
+    )
+    explanation: str = Field(description="Brief explanation of category decomposition")
+    tips: list[str] = Field(description="Tips for refining the search")
+
+
 class _FormulaGenerateAgentSingleton:
     """Singleton for formula generation agent."""
 
@@ -277,9 +386,58 @@ class _FormulaImproveAgentSingleton:
         return agent
 
 
+class _FormulaCategoryAgentSingleton:
+    """Singleton for category-based formula generation agent."""
+
+    _instance: Agent[None, AICategoryOutput] | None = None
+
+    @classmethod
+    def get(cls) -> Agent[None, AICategoryOutput]:
+        if cls._instance is None:
+            cls._instance = cls._create()
+        return cls._instance
+
+    @classmethod
+    def _create(cls) -> Agent[None, AICategoryOutput]:
+        settings = Settings()
+        provider = GoogleProvider(api_key=settings.google_api_key)
+        model = GoogleModel(settings.gemini_model, provider=provider)
+        agent = Agent(
+            model=model,
+            output_type=AICategoryOutput,
+            system_prompt=FORMULA_CATEGORY_PROMPT,
+        )
+
+        @agent.output_validator
+        async def validate_categories(
+            ctx: RunContext[None], result: AICategoryOutput
+        ) -> AICategoryOutput:
+            # Validate categories count
+            if len(result.categories) < 2:
+                raise ModelRetry(
+                    "Need at least 2 categories. Decompose the invention into technical categories."
+                )
+            if len(result.categories) > 10:
+                raise ModelRetry(
+                    "Too many categories. Consolidate into 3-7 main technical categories."
+                )
+
+            # Validate each category has keywords
+            for cat in result.categories:
+                if len(cat.keywords) < 2:
+                    raise ModelRetry(
+                        f"Category '{cat.name}' needs at least 2 keywords."
+                    )
+
+            return result
+
+        return agent
+
+
 # Expose singleton getters
 formula_generate_agent = _FormulaGenerateAgentSingleton.get
 formula_improve_agent = _FormulaImproveAgentSingleton.get
+formula_category_agent = _FormulaCategoryAgentSingleton.get
 
 
 async def generate_formula(
@@ -432,16 +590,17 @@ async def generate_formula_blocks(
     options: FormulaOptions | None = None,
 ) -> FormulaBlocksResponse:
     """
-    Generate a block-based KIPRIS search formula from invention description.
+    Generate a category-based KIPRIS search formula from invention description.
 
-    Returns blocks that users can edit, with assembled formula.
+    Decomposes the invention into technical categories, finds IPC codes for each
+    category via embedding search, and returns editable blocks.
 
     Args:
         text: Invention description or idea text
         options: Optional configuration for formula generation
 
     Returns:
-        FormulaBlocksResponse with editable blocks and assembled formula
+        FormulaBlocksResponse with category-based blocks and assembled formula
     """
     settings = Settings()
 
@@ -450,71 +609,73 @@ async def generate_formula_blocks(
     if options:
         prompt += f"\n\n[Options: precision={options.target_precision}"
         if not options.include_synonyms:
-            prompt += ", minimal synonyms"
+            prompt += ", minimal keywords per category"
         prompt += "]"
 
-    # Step 1: AI extracts keywords, synonyms, excluded terms
-    agent = formula_generate_agent()
+    # Step 1: AI extracts categories with keywords (NO IPC codes from AI)
+    agent = formula_category_agent()
     result = await agent.run(prompt)
     output = result.output
 
-    # Step 2: Get grounded IPC codes via embedding search
-    ipc_codes: list[str] = []
-    ipc_codes_raw: list[str] = []
-    if options is None or options.include_ipc:
-        ipc_service = IpcSearchService(api_key=settings.google_api_key)
-        ipc_results = await ipc_service.search(text, top_k=3)
-        ipc_codes = [f"{r.code}: {r.description[:50]}..." for r in ipc_results]
-        ipc_codes_raw = [r.code.replace(" ", "") for r in ipc_results]
-
-    # Step 3: Organize keywords into blocks
-    # Block 1: Core keywords (first 2-3 keywords with their synonyms combined)
-    # Block 2+: Additional keyword groups
-    blocks: list[FormulaBlock] = []
-    block_operators: list[str] = []
-
-    # Guard against empty keywords from AI
-    if not output.keywords:
+    # Guard against empty categories from AI
+    if not output.categories:
         return FormulaBlocksResponse(
             blocks=[],
             block_operators=[],
             assembled_formula="",
-            ipc_codes=ipc_codes,
+            ipc_codes=[],
             excluded_terms=output.excluded_terms,
-            explanation="No keywords could be extracted from the input.",
+            explanation="No categories could be extracted from the input.",
             tips=["Try providing a more detailed invention description."],
         )
 
-    for i, keyword in enumerate(output.keywords):
-        # Get synonyms for this keyword
-        keyword_synonyms = output.synonyms.get(keyword, [])
-        # Combine keyword with its synonyms as block keywords
-        all_terms = [keyword] + keyword_synonyms
+    # Step 2: For each category, find IPC codes via embedding search
+    blocks: list[FormulaBlock] = []
+    block_operators: list[str] = []
+    all_ipc_codes_display: list[str] = []  # Collect all IPC codes for response
+    seen_ipc_codes: set[str] = set()  # Track seen IPC codes for deduplication
 
-        # Determine block name based on index (English for code, localize in frontend)
-        if i == 0:
-            block_name = "Core Keywords"
-        elif i == 1:
-            block_name = "Technology Domain"
-        elif i == 2:
-            block_name = "Components"
-        else:
-            block_name = f"Keyword Group {i + 1}"
+    ipc_service: IpcSearchService | None = None
+    if options is None or options.include_ipc:
+        ipc_service = IpcSearchService(api_key=settings.google_api_key)
 
+    for i, category in enumerate(output.categories):
+        # Search IPC codes for this category name
+        category_ipc_codes: list[str] = []  # Raw codes for formula building
+        category_ipc_display: list[str] = []  # Code + full description for UI
+
+        if ipc_service:
+            ipc_results = await ipc_service.search(category.name, top_k=2)
+            for r in ipc_results:
+                code_clean = r.code.replace(" ", "")
+                # Deduplicate IPC codes across categories
+                if code_clean not in seen_ipc_codes:
+                    seen_ipc_codes.add(code_clean)
+                    category_ipc_codes.append(code_clean)
+                    # Full description (not truncated)
+                    display = f"{r.code}: {r.description}"
+                    category_ipc_display.append(display)
+                    all_ipc_codes_display.append(display)
+
+        # Create block from category
         block = FormulaBlock(
             id=f"block-{i + 1}",
-            name=block_name,
+            name=category.name,  # Use category name directly
             field="TAC",  # Default to Title+Abstract+Claims
-            keywords=all_terms,
+            keywords=category.keywords,
             operator="OR",  # Within block, keywords are OR'd
+            ipc_codes=category_ipc_display,  # Per-category IPC with full description
+            enabled=True,  # Default enabled
         )
         blocks.append(block)
 
         # Add AND operator between blocks (except after last block)
-        if i < len(output.keywords) - 1:
+        if i < len(output.categories) - 1:
             block_operators.append("AND")
 
-    # Step 4: Build assembled formula using FormulaBuilder.build_from_blocks
+    # Step 3: Build assembled formula using FormulaBuilder.build_from_blocks
+    # Only include enabled blocks
+    enabled_blocks = [b for b in blocks if b.enabled]
     blocks_as_dicts = [
         {
             "id": b.id,
@@ -522,14 +683,22 @@ async def generate_formula_blocks(
             "field": b.field,
             "keywords": b.keywords,
             "operator": b.operator,
+            "ipc_codes": b.ipc_codes,
         }
-        for b in blocks
+        for b in enabled_blocks
     ]
+
+    # Collect IPC codes from enabled blocks only
+    enabled_ipc_codes = []
+    for b in enabled_blocks:
+        enabled_ipc_codes.extend(b.ipc_codes)
 
     assembled_formula = FormulaBuilder.build_from_blocks(
         blocks=blocks_as_dicts,
-        block_operators=block_operators,
-        ipc_codes=ipc_codes_raw if ipc_codes_raw else None,
+        block_operators=block_operators[: len(enabled_blocks) - 1]
+        if enabled_blocks
+        else [],
+        ipc_codes=enabled_ipc_codes if enabled_ipc_codes else None,
         excluded_terms=output.excluded_terms if output.excluded_terms else None,
     )
 
@@ -537,7 +706,7 @@ async def generate_formula_blocks(
         blocks=blocks,
         block_operators=block_operators,
         assembled_formula=assembled_formula,
-        ipc_codes=ipc_codes,
+        ipc_codes=all_ipc_codes_display,  # All IPC codes with full descriptions
         excluded_terms=output.excluded_terms,
         explanation=output.explanation,
         tips=output.tips,
@@ -553,16 +722,26 @@ async def assemble_formula_from_blocks(
     """
     Assemble a KIPRIS formula from user-edited blocks.
 
+    Only enabled blocks are included in the formula. IPC codes are collected
+    from enabled blocks' ipc_codes fields (if available) or from the global
+    ipc_codes parameter.
+
     Args:
-        blocks: User-edited keyword blocks
+        blocks: User-edited keyword blocks (with enabled and ipc_codes fields)
         block_operators: Operators between blocks (AND/OR)
-        ipc_codes: Optional IPC codes to include
+        ipc_codes: Optional global IPC codes (fallback if blocks don't have ipc_codes)
         excluded_terms: Optional terms to exclude
 
     Returns:
         Assembled KIPRIS formula string
     """
-    # Convert blocks to dict format for FormulaBuilder
+    # Filter to only enabled blocks
+    enabled_blocks = [b for b in blocks if b.enabled]
+
+    if not enabled_blocks:
+        return ""
+
+    # Convert enabled blocks to dict format for FormulaBuilder
     blocks_as_dicts = [
         {
             "id": b.id,
@@ -570,13 +749,23 @@ async def assemble_formula_from_blocks(
             "field": b.field,
             "keywords": b.keywords,
             "operator": b.operator,
+            "ipc_codes": b.ipc_codes,
         }
-        for b in blocks
+        for b in enabled_blocks
     ]
 
-    # Clean IPC codes (remove descriptions if present)
+    # Collect IPC codes from enabled blocks
+    # Priority: block-level IPC codes > global IPC codes
+    block_ipc_codes: list[str] = []
+    for b in enabled_blocks:
+        if b.ipc_codes:
+            block_ipc_codes.extend(b.ipc_codes)
+
+    # Use block IPC codes if available, otherwise fall back to global
     clean_ipc_codes: list[str] | None = None
-    if ipc_codes:
+    if block_ipc_codes:
+        clean_ipc_codes = block_ipc_codes
+    elif ipc_codes:
         clean_ipc_codes = []
         for code in ipc_codes:
             # Handle codes like "B60L: Electric propulsion..."
@@ -585,9 +774,21 @@ async def assemble_formula_from_blocks(
             else:
                 clean_ipc_codes.append(code.replace(" ", ""))
 
+    # Adjust block_operators for enabled blocks only
+    # We need operators between consecutive enabled blocks
+    enabled_indices = [i for i, b in enumerate(blocks) if b.enabled]
+    adjusted_operators: list[str] = []
+    for i in range(len(enabled_indices) - 1):
+        # Use the operator at the position of the current enabled block
+        op_idx = enabled_indices[i]
+        if op_idx < len(block_operators):
+            adjusted_operators.append(block_operators[op_idx])
+        else:
+            adjusted_operators.append("AND")  # Default fallback
+
     return FormulaBuilder.build_from_blocks(
         blocks=blocks_as_dicts,
-        block_operators=block_operators,
+        block_operators=adjusted_operators,
         ipc_codes=clean_ipc_codes,
         excluded_terms=excluded_terms,
     )

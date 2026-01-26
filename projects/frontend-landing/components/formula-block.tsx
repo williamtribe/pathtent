@@ -1,8 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { X, Plus, ChevronDown, Trash2 } from "lucide-react"
-import { motion } from "motion/react"
+import { X, Plus, ChevronDown, ChevronUp, Trash2 } from "lucide-react"
+import { motion, AnimatePresence } from "motion/react"
 import type { FormulaBlock } from "../lib/api"
 
 const FIELD_OPTIONS = [
@@ -10,12 +10,6 @@ const FIELD_OPTIONS = [
   { value: "TI", label: "TI (Title)" },
   { value: "AB", label: "AB (Abstract)" },
   { value: "CL", label: "CL (Claims)" },
-  { value: "IPC", label: "IPC (Classification)" },
-]
-
-const OPERATOR_OPTIONS = [
-  { value: "OR", label: "OR" },
-  { value: "AND", label: "AND" },
 ]
 
 interface FormulaBlockProps {
@@ -33,6 +27,7 @@ export function FormulaBlockComponent({
 }: FormulaBlockProps) {
   const [newKeyword, setNewKeyword] = useState("")
   const [isEditingName, setIsEditingName] = useState(false)
+  const [isIpcExpanded, setIsIpcExpanded] = useState(false)
 
   const handleAddKeyword = () => {
     const trimmed = newKeyword.trim()
@@ -56,10 +51,6 @@ export function FormulaBlockComponent({
     onChange({ ...block, field })
   }
 
-  const handleOperatorChange = (operator: string) => {
-    onChange({ ...block, operator })
-  }
-
   const handleNameChange = (name: string) => {
     onChange({ ...block, name })
   }
@@ -71,17 +62,31 @@ export function FormulaBlockComponent({
     }
   }
 
+   const handleEnabledChange = (enabled: boolean) => {
+    onChange({ ...block, enabled })
+  }
+
   return (
     <motion.div
       layout
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
-      className="rounded-xl border border-border bg-white p-4 shadow-sm"
+      className={`rounded-xl border border-border bg-white p-4 shadow-sm transition-opacity ${
+        block.enabled === false ? "opacity-50" : ""
+      }`}
     >
       {/* Block Header */}
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
+          {/* Enabled Checkbox */}
+          <input
+            type="checkbox"
+            checked={block.enabled !== false}
+            onChange={(e) => handleEnabledChange(e.target.checked)}
+            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+            title={block.enabled !== false ? "Disable this category" : "Enable this category"}
+          />
           {isEditingName ? (
             <input
               type="text"
@@ -113,13 +118,14 @@ export function FormulaBlockComponent({
         )}
       </div>
 
-      {/* Field and Operator Selectors */}
-      <div className="mb-3 flex flex-wrap gap-2">
-        <div className="relative">
+      {/* Field Selector */}
+      <div className="mb-3">
+        <div className="relative inline-block">
           <select
             value={block.field}
             onChange={(e) => handleFieldChange(e.target.value)}
-            className="appearance-none rounded-lg border border-border bg-surface px-3 py-1.5 pr-8 text-sm"
+            disabled={block.enabled === false}
+            className="appearance-none rounded-lg border border-border bg-surface px-3 py-1.5 pr-8 text-sm disabled:cursor-not-allowed disabled:opacity-50"
           >
             {FIELD_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -129,25 +135,55 @@ export function FormulaBlockComponent({
           </select>
           <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
         </div>
-
-        <div className="relative">
-          <select
-            value={block.operator}
-            onChange={(e) => handleOperatorChange(e.target.value)}
-            className="appearance-none rounded-lg border border-border bg-surface px-3 py-1.5 pr-8 text-sm"
-          >
-            {OPERATOR_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-          <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
-        </div>
       </div>
 
+      {/* IPC Codes Dropdown */}
+      {block.ipc_codes && block.ipc_codes.length > 0 && (
+        <div className={`mb-3 ${block.enabled === false ? "opacity-50" : ""}`}>
+          <button
+            onClick={() => setIsIpcExpanded(!isIpcExpanded)}
+            disabled={block.enabled === false}
+            className={`flex items-center gap-1 text-xs ${
+              block.enabled === false
+                ? "text-gray-400 cursor-not-allowed"
+                : "text-blue-600 hover:text-blue-700"
+            }`}
+          >
+            <span className="font-medium">IPC:</span>
+            <span>
+              {block.ipc_codes[0]?.split(":")[0] ?? block.ipc_codes[0]}
+              {block.ipc_codes.length > 1 && ` 외 ${block.ipc_codes.length - 1}개`}
+            </span>
+            {isIpcExpanded ? (
+              <ChevronUp className="h-3 w-3" />
+            ) : (
+              <ChevronDown className="h-3 w-3" />
+            )}
+          </button>
+          <AnimatePresence>
+            {isIpcExpanded && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="overflow-hidden"
+              >
+                <div className="mt-2 space-y-1 rounded-lg bg-blue-50 p-2">
+                  {block.ipc_codes.map((code, idx) => (
+                    <div key={idx} className="text-xs text-blue-700">
+                      • {code}
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
+
       {/* Keywords */}
-      <div className="mb-3 flex flex-wrap gap-2">
+      <div className={`mb-3 flex flex-wrap gap-2 ${block.enabled === false ? "pointer-events-none" : ""}`}>
         {block.keywords.map((keyword) => (
           <motion.span
             key={keyword}
@@ -155,12 +191,19 @@ export function FormulaBlockComponent({
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.8, opacity: 0 }}
-            className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-3 py-1 text-sm text-primary"
+            className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm ${
+              block.enabled === false
+                ? "bg-gray-100 text-gray-400"
+                : "bg-primary/10 text-primary"
+            }`}
           >
             {keyword}
             <button
               onClick={() => handleRemoveKeyword(keyword)}
-              className="ml-1 rounded-full p-0.5 hover:bg-primary/20"
+              className={`ml-1 rounded-full p-0.5 ${
+                block.enabled === false ? "" : "hover:bg-primary/20"
+              }`}
+              disabled={block.enabled === false}
             >
               <X className="h-3 w-3" />
             </button>
@@ -169,18 +212,19 @@ export function FormulaBlockComponent({
       </div>
 
       {/* Add Keyword Input */}
-      <div className="flex gap-2">
+      <div className={`flex gap-2 ${block.enabled === false ? "pointer-events-none opacity-50" : ""}`}>
         <input
           type="text"
           value={newKeyword}
           onChange={(e) => setNewKeyword(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="키워드 추가..."
-          className="flex-1 rounded-lg border border-border bg-white px-3 py-1.5 text-sm placeholder:text-text-muted"
+          disabled={block.enabled === false}
+          className="flex-1 rounded-lg border border-border bg-white px-3 py-1.5 text-sm placeholder:text-text-muted disabled:cursor-not-allowed disabled:bg-gray-50"
         />
         <button
           onClick={handleAddKeyword}
-          disabled={!newKeyword.trim()}
+          disabled={!newKeyword.trim() || block.enabled === false}
           className="inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-sm text-white hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Plus className="h-4 w-4" />

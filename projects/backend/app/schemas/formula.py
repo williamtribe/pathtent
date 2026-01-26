@@ -92,6 +92,14 @@ class FormulaBlock(BaseModel):
         default="OR",
         description="Operator within the block (OR or AND)",
     )
+    ipc_codes: list[str] = Field(
+        default_factory=list,
+        description="IPC codes for this category (from embedding search)",
+    )
+    enabled: bool = Field(
+        default=True,
+        description="Whether this block is enabled in the formula",
+    )
 
 
 class FormulaBlocksResponse(BaseModel):
