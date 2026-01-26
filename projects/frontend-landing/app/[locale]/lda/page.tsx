@@ -250,7 +250,8 @@ export default function LDAPage() {
       let patents: FreeSearchResult[]
       try {
         const searchResult = await searchKIPRIS({
-          keywords: allKeywords,
+          keywords: formulaResult.keywords,
+          synonyms: formulaResult.synonyms,
           max_results: maxPatents,
         })
         patents = searchResult.patents

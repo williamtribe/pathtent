@@ -817,6 +817,7 @@ export async function processNoiseRemoval(
 
 export interface KIPRISSearchRequest {
   keywords: string[]
+  synonyms?: Record<string, string[]>
   max_results?: number
 }
 
