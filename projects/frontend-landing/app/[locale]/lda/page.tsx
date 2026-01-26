@@ -1,6 +1,4 @@
-// @TODO-3 — Unified LDA analysis with step-by-step API calls
-// @TODO-9 — Add tabs UI, step 5, pass metadata to LDA API
-"use client"
+use client
 
 import { useState, useCallback } from "react"
 import { motion, AnimatePresence } from "motion/react"

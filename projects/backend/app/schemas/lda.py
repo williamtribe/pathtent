@@ -1,4 +1,3 @@
-# @TODO-2 — Add patent metadata fields to request
 """LDA topic modeling API schemas for patent analysis."""
 
 from pydantic import BaseModel, Field
@@ -114,7 +113,6 @@ class DocumentTopic(BaseModel):
     )
 
 
-# @TODO-3 — Add quantitative field to LDAResponse
 class LDAResponse(BaseModel):
     """Response model for LDA topic modeling results."""
 

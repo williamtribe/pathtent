@@ -516,7 +516,6 @@ export interface DocumentTopic {
   topic_distribution: number[]
 }
 
-// @TODO-8 — Add quantitative types to frontend
 export interface YearlyCount {
   year: number
   count: number

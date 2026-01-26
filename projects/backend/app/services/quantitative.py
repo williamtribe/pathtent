@@ -1,4 +1,3 @@
-# @TODO-4 — Create quantitative analysis service
 """Quantitative analysis service for patent statistics."""
 
 from collections import Counter

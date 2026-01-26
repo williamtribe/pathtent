@@ -1,5 +1,4 @@
-// @TODO-6 — Create quantitative charts component with Recharts
-"use client"
+use client
 
 import { useMemo } from "react"
 import {

@@ -10,7 +10,6 @@ from gensim.models import CoherenceModel, LdaModel
 from scipy.spatial.distance import jensenshannon
 from sklearn.manifold import MDS
 
-# @TODO-7 — Fix PatentForLDA compatibility
 from app.schemas.lda import (
     DocumentTopic,
     LDARequest,

@@ -1,4 +1,3 @@
-# @TODO-1 — Create quantitative analysis schemas
 """Quantitative analysis schemas for patent statistics."""
 
 from pydantic import BaseModel, Field
