@@ -224,7 +224,7 @@ export default function LDAPage() {
         if (!customNoiseConfig) {
           setCustomNoiseConfig({
             embedding_query: description,
-            embedding_threshold: 0.3,
+            embedding_threshold: 0.7,
           })
         }
 
@@ -290,7 +290,7 @@ export default function LDAPage() {
         try {
           const noiseConfig: NoiseRemovalConfig = customNoiseConfig || {
             embedding_query: description,
-            embedding_threshold: 0.3,
+            embedding_threshold: 0.7,
           }
 
           const noiseResult = await processNoiseRemoval({
