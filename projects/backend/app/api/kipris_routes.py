@@ -5,8 +5,12 @@ Provides endpoints for direct KIPRIS freeSearch API access.
 
 # @TODO-1 — KIPRIS freeSearch wrapper endpoint
 
+import logging
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
+
+logger = logging.getLogger(__name__)
 
 from kipris.client import KIPRISClient
 from kipris.models import FreeSearchResult
@@ -61,8 +65,14 @@ async def search_kipris(request: KIPRISSearchRequest) -> KIPRISSearchResponse:
     # Deduplicate while preserving order
     unique_keywords = list(dict.fromkeys(cleaned_keywords))
 
-    # Use all available keywords (up to 45) for maximum coverage
-    search_query = " ".join(unique_keywords[:45])
+    logger.info(
+        f"KIPRIS: {len(request.keywords)} input -> {len(unique_keywords)} after filter"
+    )
+
+    # Build OR search query using + operator: (kw1+kw2+kw3+...)
+    # KIPRIS uses + for OR logic
+    search_query = "(" + "+".join(unique_keywords) + ")"
+    logger.info(f"KIPRIS OR query: {search_query[:100]}...")
 
     if not search_query:
         raise HTTPException(status_code=400, detail="No valid keywords provided")
