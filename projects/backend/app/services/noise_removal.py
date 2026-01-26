@@ -169,6 +169,14 @@ class NoiseRemovalService:
         kept: list[FreeSearchResult] = []
         excluded: list[ExcludedPatent] = []
 
+        # Log similarity distribution for debugging
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.info(
+            f"Embedding similarities - min: {similarities.min():.3f}, max: {similarities.max():.3f}, mean: {similarities.mean():.3f}, threshold: {threshold}"
+        )
+
         for patent, score in zip(patents, similarities):
             if score >= threshold:
                 kept.append(patent)
@@ -181,6 +189,10 @@ class NoiseRemovalService:
                         similarity_score=float(score),
                     )
                 )
+
+        logger.info(
+            f"Embedding filter: {len(patents)} -> {len(kept)} (excluded {len(excluded)})"
+        )
 
         return kept, excluded
 
