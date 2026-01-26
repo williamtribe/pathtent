@@ -205,12 +205,17 @@ export default function LDAPage() {
       try {
         formulaResult = await generateFormula(description, {})
         
-        // Collect all keywords from categories (includes typos, variations, etc.)
-        if (formulaResult.categories && formulaResult.categories.length > 0) {
-          allKeywords = formulaResult.categories.flatMap((cat) => cat.keywords)
+        // Collect core keywords + all synonyms (includes typos, variations, etc.)
+        if (formulaResult.synonyms && Object.keys(formulaResult.synonyms).length > 0) {
+          allKeywords = [
+            ...formulaResult.keywords,
+            ...Object.values(formulaResult.synonyms).flat(),
+          ]
         } else {
           allKeywords = formulaResult.keywords
         }
+        // Remove duplicates while preserving order
+        allKeywords = [...new Set(allKeywords)]
         setGeneratedKeywords(allKeywords)
 
         // Auto-generate noise config from description if not set
