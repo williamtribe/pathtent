@@ -3,6 +3,9 @@ builder = "dockerfile"
 dockerfilePath = "projects/backend/Dockerfile"
 watchPatterns = ["projects/backend/**"]
 
+[build.env]
+GIT_LFS_ENABLED = "1"
+
 [deploy]
 healthcheckPath = "/health"
 restartPolicyType = "on_failure"

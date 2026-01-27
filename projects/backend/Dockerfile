@@ -30,8 +30,11 @@ COPY projects/backend/kipris ./kipris
 COPY projects/backend/alembic ./alembic
 COPY projects/backend/alembic.ini ./
 
+# Copy data files (IPC embeddings)
+COPY projects/backend/data ./data
+
 # Expose port (Railway uses $PORT)
-EXPOSE 8000
+EXPOSE 8080
 
 # Run the application with Railway's PORT
-CMD ["sh", "-c", "uv run uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD ["sh", "-c", "uv run uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8080}"]
