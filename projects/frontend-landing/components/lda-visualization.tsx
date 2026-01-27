@@ -18,7 +18,7 @@ import {
 } from "recharts"
 import { motion, AnimatePresence } from "motion/react"
 import { TrendingUp, FileText, Hash } from "lucide-react"
-import type { LDAResponse, CollectResponse } from "../lib/api"
+import type { LDAResponse, FreeSearchResult } from "../lib/api"
 
 // Modern color palette (bright, accessible)
 const COLORS = [
@@ -34,9 +34,16 @@ const COLORS = [
   "#f43f5e", // rose
 ]
 
+interface LDACollectData {
+  total: number
+  collected: number
+  patents: FreeSearchResult[]
+  formula: string
+}
+
 interface LDAVisualizationProps {
   ldaResult: LDAResponse
-  collectResult: CollectResponse
+  collectResult: LDACollectData
 }
 
 export function LDAVisualization({
