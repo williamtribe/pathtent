@@ -1,8 +1,9 @@
 # Project State
 ## Current Status
 - **Date**: 2026-01-28
-- **Last Action**: IPC-to-Qdrant migration code complete (awaiting user to run scripts)
+- **Last Action**: Security Screening COMPLETE, session halted
 - **Current Branch**: `feature/ipc-to-qdrant`
+- **Last Commit**: `9bd8127` - feat(backend): migrate IPC search from NPZ to Qdrant
 ---
 ## Deployment Status
 ### URLs
@@ -11,43 +12,38 @@
 | Frontend | https://pathtent.ai                         | Active      |
 | Backend  | https://pathtent-production-e7c2.up.railway.app | API keys removed (paused) |
 ### Infrastructure (Railway)
-- **PostgreSQL**: Running (empty, migrations done)
-- **Qdrant**: Running (empty - awaiting IPC upload)
+- **PostgreSQL**: Running (migrations done, URL secured internally)
+- **Qdrant**: Running (local has 8367 IPC vectors, prod empty)
 - **Backend**: Running but disabled (API keys removed)
 ### Vercel
 - Domain `pathtent.ai` connected and verified
 - SSL certificate active (Let's Encrypt)
 ---
-## IPC-to-Qdrant Migration (COMPLETED - Code Ready)
-### Changes Made
-| File | Change |
-| ---- | ------ |
-| `app/services/embedding.py` | Added `output_dimensionality=768`, L2 normalization |
-| `app/config.py` | Added `embedding_dimension=768` field |
-| `scripts/build_ipc_embeddings.py` | Updated for 768-dim + normalization |
-| `scripts/upload_ipc_to_qdrant.py` | **NEW** - Upload script for Qdrant |
-| `app/services/ipc_search.py` | Refactored to query Qdrant instead of NPZ |
-| `.gitignore` | Added `ipc_embeddings.npz` to ignore |
+## IPC-to-Qdrant Migration ✅ COMPLETE
+- Embeddings: 8,367 IPC codes @ 768 dimensions
+- L2 normalized, uploaded to local Qdrant
+- Sanity checked: proper clustering, good diversity
+- Backend tested and working
+---
+## Security Screening ✅ COMPLETE
+### Issues Found (for future hardening)
+| Issue | Location | Priority |
+|-------|----------|----------|
+| CORS wildcard (`allow_methods=["*"]`) | `backend/app/main.py:29` | Medium |
+| No rate limiting | Backend-wide | Medium |
+| No auth on endpoints | Backend-wide | High (before prod) |
+| Error details exposed via `str(e)` | 11+ route handlers | Low |
+| Hardcoded localhost URLs | `frontend/generate-v2/page.tsx:43,78,107` | Low |
+| No security headers (CSP, HSTS) | `next.config.mjs` | Low |
+| XSS payloads accepted in forms | Frontend forms | Low (React escapes) |
 
-### User Action Required
-```bash
-# Step 1: Re-generate embeddings (768-dim, normalized)
-cd projects/backend
-uv run python scripts/build_ipc_embeddings.py
+### Current Mitigation
+- API keys manually redacted when not in use
+- PostgreSQL URL secured within Railway internal network
+- No CRUD/auth implemented yet, so most issues deferred
 
-# Step 2: Upload to Qdrant (local or Railway)
-uv run python scripts/upload_ipc_to_qdrant.py
-```
-
-### Architecture After Migration
-| Component  | Purpose                        | Dimension | Collection |
-| ---------- | ------------------------------ | --------- | ---------- |
-| IPC Search | Find relevant IPC codes        | 768       | `ipc_codes` |
-| Patent Similarity | Find similar patents    | 768       | `pathtent` |
-| Future Patents | 3M patent embeddings       | 768       | TBD |
-
-**All vectors now standardized at 768 dimensions!**
-
+### Status
+Safe for development/testing. Address before restoring API keys for production.
 ---
 ## Recent Decisions (2026-01-28)
 ### Embedding Dimension: 768
@@ -55,35 +51,27 @@ uv run python scripts/upload_ipc_to_qdrant.py
 - **Storage savings**: 4x reduction (162GB → 41GB for 9M vectors)
 - **Quality**: 768-dim captures 95%+ of semantic meaning
 
-### Dependency Cleanup
-**Backend removed:**
-- `kiwipiepy` - never used, caused mecab build issues
-- `pandas` - no imports
-- `openpyxl` - no imports
-**Frontend removed:**
-- `@fontsource-variable/mona-sans`, `@gsap/react`, `@radix-ui/themes`, `heroicons`, `material-symbols`
-**Impact:** 87 packages removed
-
-### Git LFS Removal
-- `ipc_embeddings.npz` removed from Git LFS and now gitignored
-- Will be regenerated locally via script
+### Type Errors
+- Reduced from 60 to 53 (fixed critical ones)
+- Remaining are non-blocking (str|None, Literal types, test mocks)
+- Tracked for future cleanup
 ---
 ## Next Steps (Priority Order)
-### 1. Run Migration Scripts (USER ACTION)
-- Run `build_ipc_embeddings.py` to regenerate 768-dim embeddings
-- Run `upload_ipc_to_qdrant.py` to upload to Qdrant
-- Test IPC search functionality
-
-### 2. Security Screening
-- API is currently open (no auth)
-- Need: API key auth, rate limiting, CORS hardening
-- Add user authentication for production
-
-### 3. CI/CD Setup (GitHub Actions)
+### 1. CI/CD Setup (GitHub Actions)
 - Type checking (TypeScript, basedpyright)
 - Linting (ESLint, Ruff)
 - Build verification
 - Auto-deploy OFF (manual deployment preferred)
+
+### 2. Security Hardening (Before Production)
+- Tighten CORS to specific origins
+- Add rate limiting middleware
+- Implement API authentication
+- Add security headers to Next.js
+
+### 3. Production IPC Upload
+- Run upload script against Railway Qdrant
+- Restore API keys after security hardening
 ---
 ## Environment Variables Reference
 ### Backend (Railway)
@@ -101,15 +89,14 @@ NEXT_PUBLIC_API_URL=https://pathtent-production-e7c2.up.railway.app
 ```
 ---
 ## Known Issues
-- Backend has 61 pre-existing type errors (basedpyright)
-- Some embedding tests failing (mock issues)
-- Removed stale @TODO markers from kipris_routes.py and noise_removal_routes.py
+- Backend has 53 pre-existing type errors (basedpyright) - non-blocking
+- LDA coherence ~0.3 (normal for Korean patent text)
 ---
 ## Learnings
 - `kipris/` folder is LOCAL code (KIPRIS API client), not kiwipiepy package
 - Railway doesn't reliably fetch Git LFS files
 - Railway zero-replica pause not available, use API key removal instead
-- Vercel domain verification requires TXT record at `_vercel.domain`
-- DNS propagation takes minutes to hours
 - Gemini embedding-001 outputs 3072-dim by default; use `output_dimensionality` param for 768
 - Reduced dimension embeddings need L2 normalization (full 3072 is auto-normalized)
+- LDA coherence 0.3-0.4 is acceptable for Korean technical text
+- React auto-escapes XSS on render, but input validation still recommended
