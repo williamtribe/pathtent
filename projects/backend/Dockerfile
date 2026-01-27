@@ -18,13 +18,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 # Copy dependency files first (better layer caching)
-COPY pyproject.toml uv.lock ./
+# Note: Railway builds from repo root, so use full path
+COPY projects/backend/pyproject.toml projects/backend/uv.lock ./
 
 # Install dependencies (no dev dependencies for production)
 RUN uv sync --frozen --no-dev
 
 # Copy application code
-COPY . .
+COPY projects/backend/app ./app
+COPY projects/backend/kipris ./kipris
+COPY projects/backend/alembic ./alembic
+COPY projects/backend/alembic.ini ./
 
 # Expose port (Railway uses $PORT)
 EXPOSE 8000
