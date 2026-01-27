@@ -1,4 +1,18 @@
+# ===================
+# Environment & Secrets
+# ===================
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.json
+secrets.json
+service-account*.json
+
+# ===================
 # Python
+# ===================
 __pycache__/
 *.py[cod]
 *$py.class
@@ -22,33 +36,81 @@ wheels/
 .installed.cfg
 *.egg
 MANIFEST
-
-# Virtual Environment
+.venv/
 venv/
 ENV/
 env/
-# IDE
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# ===================
+# Node / Frontend
+# ===================
+node_modules/
+.next/
+out/
+.turbo/
+.vercel/
+.serwist/
+*.tsbuildinfo
+.npm/
+.yarn/
+
+# ===================
+# Chrome Extension
+# ===================
+.output/
+*.zip
+*.crx
+
+# ===================
+# IDE & Editors
+# ===================
 .vscode/
+!.vscode/settings.json
+!.vscode/extensions.json
 .idea/
 *.swp
 *.swo
 *~
-# OS
+*.sublime-*
+
+# ===================
+# OS Files
+# ===================
 .DS_Store
+.DS_Store?
+._*
 Thumbs.db
+ehthumbs.db
+Desktop.ini
 
-# Environment files
-.env
-.env.local
-
-# Python virtual env
-.venv/
-
-# Node
-node_modules/
-.next/
-
-# Logs
-server.log
+# ===================
+# Logs & Debug
+# ===================
 *.log
+server.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+debug.log
 nul
+
+# ===================
+# Testing & Coverage
+# ===================
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+
+# ===================
+# Misc
+# ===================
+*.bak
+*.tmp
+*.temp
+.cache/
