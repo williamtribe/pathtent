@@ -495,13 +495,6 @@ export interface CollectResponse {
 // LDA Types
 // ============================================================================
 
-export interface LDARequest {
-  patents: { id: string; text: string }[]
-  num_topics?: number | 'auto'
-  min_df?: number
-  max_df?: number
-}
-
 export interface TopicCoordinate {
   x: number
   y: number
@@ -523,12 +516,55 @@ export interface DocumentTopic {
   topic_distribution: number[]
 }
 
+export interface YearlyCount {
+  year: number
+  count: number
+}
+
+export interface TechFieldCount {
+  field: string
+  count: number
+  percentage: number
+}
+
+export interface IPCCount {
+  code: string
+  description: string
+  count: number
+  percentage: number
+}
+
+export interface QuantitativeResult {
+  yearly_trend: YearlyCount[]
+  tech_field_distribution: TechFieldCount[]
+  ipc_distribution: IPCCount[]
+}
+
+export interface PatentMetadata {
+  application_date?: string | null
+  ipc_codes: string[]
+}
+
+export interface PatentForLDA {
+  id: string
+  text: string
+  metadata?: PatentMetadata | null
+}
+
+export interface LDARequest {
+  patents: PatentForLDA[]
+  num_topics?: number | "auto"
+  min_df?: number
+  max_df?: number
+}
+
 export interface LDAResponse {
   topics: Topic[]
   documents: DocumentTopic[]
   coherence_score: number
   num_topics: number
   vocabulary_size: number
+  quantitative?: QuantitativeResult | null
 }
 
 // ============================================================================

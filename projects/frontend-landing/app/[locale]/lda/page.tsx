@@ -1,4 +1,3 @@
-// @TODO-3 — Unified LDA analysis with step-by-step API calls
 "use client"
 
 import { useState, useCallback } from "react"
@@ -16,6 +15,7 @@ import {
   XCircle,
   Circle,
   RefreshCw,
+  TrendingUp,
 } from "lucide-react"
 import {
   generateFormula,
@@ -26,8 +26,10 @@ import {
   type FreeSearchResult,
   type LDAResponse,
   type FormulaResult,
+  type PatentForLDA,
 } from "../../../lib/api"
 import { LDAVisualization } from "../../../components/lda-visualization"
+import { QuantitativeCharts } from "../../../components/quantitative-charts"
 
 // Step definition
 interface StepState {
@@ -47,6 +49,7 @@ function StepStatus({ stepState }: { stepState: StepState }) {
     kipris_search: { icon: <Search className="h-4 w-4" />, label: "특허 검색" },
     noise_removal: { icon: <Filter className="h-4 w-4" />, label: "노이즈 제거" },
     lda_analysis: { icon: <BarChart3 className="h-4 w-4" />, label: "LDA 분석" },
+    quantitative_analysis: { icon: <TrendingUp className="h-4 w-4" />, label: "정량분석" },
   }
 
   const { icon, label } = stepLabels[step] || { icon: <Circle className="h-4 w-4" />, label: step }
@@ -146,6 +149,7 @@ const initialSteps: StepState[] = [
   { step: "kipris_search", status: "pending" },
   { step: "noise_removal", status: "pending" },
   { step: "lda_analysis", status: "pending" },
+  { step: "quantitative_analysis", status: "pending" },
 ]
 
 export default function LDAPage() {
@@ -172,6 +176,7 @@ export default function LDAPage() {
   const [isRerunningNoiseRemoval, setIsRerunningNoiseRemoval] = useState(false)
   const [isRerunningLDA, setIsRerunningLDA] = useState(false)
   const [ldaResult, setLdaResult] = useState<LDAResponse | null>(null)
+  const [activeTab, setActiveTab] = useState<"lda" | "quantitative">("lda")
 
   // Helper to update a specific step
   const updateStep = (stepName: string, updates: Partial<StepState>) => {
@@ -194,6 +199,7 @@ export default function LDAPage() {
     setSearchSummary(null)
     setFilteredPatents([])
     setLdaResult(null)
+    setActiveTab("lda")
 
     try {
       // ========================================
@@ -332,7 +338,8 @@ export default function LDAPage() {
         const step4Start = performance.now()
 
         try {
-          const ldaDocuments = validPatents
+          // Include metadata for quantitative analysis
+          const ldaDocuments: PatentForLDA[] = validPatents
             .map((patent) => {
               const textParts: string[] = []
               if (patent.invention_name) textParts.push(patent.invention_name)
@@ -340,6 +347,10 @@ export default function LDAPage() {
               return {
                 id: patent.application_number || `patent-${Math.random()}`,
                 text: textParts.join(" "),
+                metadata: {
+                  application_date: patent.application_date ?? null,
+                  ipc_codes: patent.ipc_number ? [patent.ipc_number] : [],
+                },
               }
             })
             .filter((doc) => doc.text.trim().length > 0)
@@ -357,10 +368,27 @@ export default function LDAPage() {
             message: `${ldaResponse.num_topics}개 토픽 추출 (coherence: ${ldaResponse.coherence_score.toFixed(3)})`,
             duration: step4Duration,
           })
+
+          // Step 5: Quantitative analysis (included in LDA response)
+          if (ldaResponse.quantitative) {
+            updateStep("quantitative_analysis", {
+              status: "completed",
+              message: `연도별 ${ldaResponse.quantitative.yearly_trend.length}건, IPC ${ldaResponse.quantitative.ipc_distribution.length}개`,
+            })
+          } else {
+            updateStep("quantitative_analysis", {
+              status: "completed",
+              message: "메타데이터 없음 (정량분석 건너뜀)",
+            })
+          }
         } catch (err) {
           updateStep("lda_analysis", {
             status: "failed",
             message: err instanceof Error ? err.message : "LDA 분석 실패",
+          })
+          updateStep("quantitative_analysis", {
+            status: "failed",
+            message: "LDA 분석 실패로 건너뜀",
           })
           throw err
         }
@@ -369,6 +397,10 @@ export default function LDAPage() {
           status: "completed",
           message: "특허 수 부족 (최소 3건 필요)",
           duration: 0,
+        })
+        updateStep("quantitative_analysis", {
+          status: "completed",
+          message: "특허 수 부족으로 건너뜀",
         })
       }
     } catch (err) {
@@ -419,7 +451,8 @@ export default function LDAPage() {
         updateStep("lda_analysis", { status: "running" })
         const step4Start = performance.now()
         
-        const ldaDocuments = validPatents
+        // Include metadata for quantitative analysis
+        const ldaDocuments: PatentForLDA[] = validPatents
           .map((patent) => {
             const textParts: string[] = []
             if (patent.invention_name) textParts.push(patent.invention_name)
@@ -427,6 +460,10 @@ export default function LDAPage() {
             return {
               id: patent.application_number || `patent-${Math.random()}`,
               text: textParts.join(" "),
+              metadata: {
+                application_date: patent.application_date ?? null,
+                ipc_codes: patent.ipc_number ? [patent.ipc_number] : [],
+              },
             }
           })
           .filter((doc) => doc.text.trim().length > 0)
@@ -444,6 +481,19 @@ export default function LDAPage() {
           message: `${newLdaResult.num_topics}개 토픽 추출 (coherence: ${newLdaResult.coherence_score.toFixed(3)})`,
           duration: step4Duration,
         })
+
+        // Update quantitative step
+        if (newLdaResult.quantitative) {
+          updateStep("quantitative_analysis", {
+            status: "completed",
+            message: `연도별 ${newLdaResult.quantitative.yearly_trend.length}건, IPC ${newLdaResult.quantitative.ipc_distribution.length}개`,
+          })
+        } else {
+          updateStep("quantitative_analysis", {
+            status: "completed",
+            message: "메타데이터 없음",
+          })
+        }
       } else {
         setLdaResult(null)
         updateStep("lda_analysis", {
@@ -451,10 +501,12 @@ export default function LDAPage() {
           message: `특허 수 부족 (${validPatents.length}건, 최소 3건 필요)`,
           duration: 0,
         })
+        updateStep("quantitative_analysis", { status: "pending" })
         setError(`필터링 후 특허가 ${validPatents.length}건으로 LDA 분석이 불가합니다 (최소 3건 필요)`)
       }
     } catch (err) {
       updateStep("noise_removal", { status: "failed", message: err instanceof Error ? err.message : "실패" })
+      updateStep("quantitative_analysis", { status: "failed", message: "노이즈 제거 실패" })
       setError(err instanceof Error ? err.message : "노이즈 제거 재실행 실패")
     } finally {
       setIsRerunningNoiseRemoval(false)
@@ -472,7 +524,8 @@ export default function LDAPage() {
     setError(null)
 
     try {
-      const ldaDocuments = filteredPatents
+      // Include metadata for quantitative analysis
+      const ldaDocuments: PatentForLDA[] = filteredPatents
         .map((patent) => {
           const textParts: string[] = []
           if (patent.invention_name) textParts.push(patent.invention_name)
@@ -480,6 +533,10 @@ export default function LDAPage() {
           return {
             id: patent.application_number || `patent-${Math.random()}`,
             text: textParts.join(" "),
+            metadata: {
+              application_date: patent.application_date ?? null,
+              ipc_codes: patent.ipc_number ? [patent.ipc_number] : [],
+            },
           }
         })
         .filter((doc) => doc.text.trim().length > 0)
@@ -490,6 +547,14 @@ export default function LDAPage() {
       })
 
       setLdaResult(newLdaResult)
+
+      // Update quantitative step
+      if (newLdaResult.quantitative) {
+        updateStep("quantitative_analysis", {
+          status: "completed",
+          message: `연도별 ${newLdaResult.quantitative.yearly_trend.length}건, IPC ${newLdaResult.quantitative.ipc_distribution.length}개`,
+        })
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "LDA 재분석 실패")
     } finally {
@@ -739,10 +804,47 @@ export default function LDAPage() {
               </div>
             </div>
 
-            <LDAVisualization
-              ldaResult={ldaResult}
-              collectResult={collectResult}
-            />
+            {/* Tab buttons */}
+            <div className="mb-6 flex gap-2 border-b border-gray-200">
+              <button
+                onClick={() => setActiveTab("lda")}
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${
+                  activeTab === "lda"
+                    ? "border-b-2 border-primary text-primary"
+                    : "text-text-muted hover:text-text"
+                }`}
+              >
+                <BarChart3 className="h-4 w-4" />
+                LDA 토픽
+              </button>
+              <button
+                onClick={() => setActiveTab("quantitative")}
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${
+                  activeTab === "quantitative"
+                    ? "border-b-2 border-primary text-primary"
+                    : "text-text-muted hover:text-text"
+                }`}
+                disabled={!ldaResult?.quantitative}
+              >
+                <TrendingUp className="h-4 w-4" />
+                정량분석
+                {!ldaResult?.quantitative && (
+                  <span className="text-xs text-text-muted">(데이터 없음)</span>
+                )}
+              </button>
+            </div>
+
+            {/* Tab content */}
+            {activeTab === "lda" && (
+              <LDAVisualization
+                ldaResult={ldaResult}
+                collectResult={collectResult}
+              />
+            )}
+
+            {activeTab === "quantitative" && ldaResult?.quantitative && (
+              <QuantitativeCharts data={ldaResult.quantitative} />
+            )}
           </motion.div>
         )}
 

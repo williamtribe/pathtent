@@ -14,9 +14,29 @@ from app.schemas.lda import (
     DocumentTopic,
     LDARequest,
     LDAResponse,
+    PatentForLDA,
     Topic,
     TopicCoordinate,
 )
+
+
+def _get_patent_text(patent: PatentForLDA | dict[str, str]) -> str:
+    """Extract text from patent (handles both dict and PatentForLDA)."""
+    if isinstance(patent, dict):
+        if "text" not in patent:
+            raise ValueError("Patent dict missing required 'text' field")
+        return patent["text"]
+    return patent.text
+
+
+def _get_patent_id(patent: PatentForLDA | dict[str, str]) -> str:
+    """Extract id from patent (handles both dict and PatentForLDA)."""
+    if isinstance(patent, dict):
+        if "id" not in patent:
+            raise ValueError("Patent dict missing required 'id' field")
+        return patent["id"]
+    return patent.id
+
 
 # Path to stopwords file (Korean language stopwords loaded at runtime)
 STOPWORDS_FILE = Path(__file__).parent.parent / "data" / "korean_stopwords.txt"
@@ -107,7 +127,7 @@ class LDAAnalyzer:
 
     def _prepare_corpus(
         self,
-        documents: list[dict[str, str]],
+        documents: list[PatentForLDA | dict[str, str]],
         min_df: int = 2,
         max_df: float = 0.95,
     ) -> tuple[list[list[str]], corpora.Dictionary, list[list[tuple[int, int]]]]:
@@ -115,15 +135,15 @@ class LDAAnalyzer:
         Prepare corpus for LDA training.
 
         Args:
-            documents: List of documents with 'id' and 'text' fields
+            documents: List of patents (PatentForLDA or dict with 'id' and 'text')
             min_df: Minimum document frequency for term inclusion
             max_df: Maximum document frequency ratio for term exclusion
 
         Returns:
             Tuple of (tokenized_docs, dictionary, corpus)
         """
-        # Tokenize all documents
-        tokenized_docs = [self._tokenize(doc["text"]) for doc in documents]
+        # Tokenize all documents (handle both dict and PatentForLDA)
+        tokenized_docs = [self._tokenize(_get_patent_text(doc)) for doc in documents]
 
         # Create dictionary
         dictionary = corpora.Dictionary(tokenized_docs)
@@ -322,7 +342,7 @@ class LDAAnalyzer:
 
                 documents.append(
                     DocumentTopic(
-                        patent_id=doc["id"],
+                        patent_id=_get_patent_id(doc),
                         topic_id=dominant_topic,
                         probability=dominant_prob,
                         topic_distribution=topic_probs,
