@@ -114,3 +114,11 @@ test-results/
 *.tmp
 *.temp
 .cache/
+
+# ===================
+# Data Files (regenerated via scripts)
+# ===================
+# IPC embeddings - regenerate with: uv run python scripts/build_ipc_embeddings.py
+projects/backend/data/ipc_embeddings.npz
+projects/backend/data/ipc_embeddings_checkpoint.npz
+projects/backend/data/ipc_embeddings_mapping.json

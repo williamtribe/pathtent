@@ -1,7 +1,5 @@
 """API routes for noise removal pipeline."""
 
-# @TODO-2 — Updated for simplified 2-step noise removal (dedup + embedding)
-
 from fastapi import APIRouter, HTTPException
 
 from app.config import Settings

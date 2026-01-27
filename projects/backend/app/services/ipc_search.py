@@ -2,7 +2,7 @@
 IPC Search Service - Embedding-based IPC code lookup.
 
 This service provides grounded IPC code recommendations
-by searching pre-computed Korean embeddings.
+by searching pre-computed Korean embeddings stored in Qdrant.
 
 Usage:
     service = IpcSearchService(api_key="...")
@@ -10,14 +10,15 @@ Usage:
     # Returns: [IpcSearchResult(code="H01M-010", description="...", score=0.85), ...]
 """
 
-import json
 from dataclasses import dataclass
-from pathlib import Path
 
-import numpy as np
+from qdrant_client import AsyncQdrantClient
+from qdrant_client.models import FieldCondition, Filter, MatchValue
 
-from app.config import Settings
 from app.services.embedding import GeminiEmbeddingService
+
+# Qdrant collection name for IPC embeddings
+IPC_COLLECTION_NAME = "ipc_codes"
 
 
 @dataclass
@@ -32,49 +33,28 @@ class IpcSearchResult:
 
 class IpcSearchService:
     """
-    Embedding-based IPC code search service.
+    Embedding-based IPC code search service using Qdrant.
 
-    Loads pre-computed Korean IPC embeddings and performs cosine similarity
-    search to find relevant IPC codes for a given invention description.
+    Queries pre-computed Korean IPC embeddings stored in Qdrant
+    to find relevant IPC codes for a given invention description.
     """
 
     def __init__(
         self,
         api_key: str,
-        embeddings_path: str | None = None,
-        ipc_json_path: str | None = None,
+        qdrant_url: str = "http://localhost:6333",
+        qdrant_api_key: str | None = None,
     ) -> None:
         """
         Initialize IPC search service.
 
         Args:
             api_key: Google AI API key for embedding queries
-            embeddings_path: Path to ipc_embeddings.npz (default: data/ipc_embeddings.npz)
-            ipc_json_path: Path to ipc_codes.json (default: data/ipc_codes.json)
+            qdrant_url: Qdrant server URL
+            qdrant_api_key: Optional API key for Qdrant Cloud
         """
         self.api_key = api_key
-
-        # Default paths
-        data_dir = Path(__file__).parent.parent.parent / "data"
-        if embeddings_path is None:
-            embeddings_path = str(data_dir / "ipc_embeddings.npz")
-        if ipc_json_path is None:
-            ipc_json_path = str(data_dir / "ipc_codes.json")
-
-        # Load embeddings
-        npz_data = np.load(embeddings_path, allow_pickle=True)
-        self.embeddings: np.ndarray = npz_data["embeddings"]  # (N, 3072)
-        self.codes: list[str] = npz_data["codes"].tolist()  # N codes
-
-        # Normalize embeddings for cosine similarity (dot product after normalization)
-        norms = np.linalg.norm(self.embeddings, axis=1, keepdims=True)
-        self.embeddings_normalized = self.embeddings / (norms + 1e-9)
-
-        # Load IPC metadata
-        with open(ipc_json_path, encoding="utf-8") as f:
-            self.ipc_data: dict = json.load(f)
-
-        # Embedding service for queries
+        self.qdrant_client = AsyncQdrantClient(url=qdrant_url, api_key=qdrant_api_key)
         self.embedding_service = GeminiEmbeddingService(api_key=api_key)
 
     async def search(
@@ -84,7 +64,7 @@ class IpcSearchService:
         level_filter: str | None = None,
     ) -> list[IpcSearchResult]:
         """
-        Search for relevant IPC codes.
+        Search for relevant IPC codes using Qdrant.
 
         Args:
             query: Invention description or technical keywords (Korean)
@@ -94,46 +74,40 @@ class IpcSearchService:
         Returns:
             List of IpcSearchResult sorted by relevance (highest first)
         """
-        # Embed query directly (Korean embeddings)
+        # Embed query (returns normalized 768-dim vector)
         query_embedding = await self.embedding_service.embed(query)
-        query_vec = np.array(query_embedding, dtype=np.float32)
 
-        # Normalize query
-        query_norm = np.linalg.norm(query_vec)
-        query_normalized = query_vec / (query_norm + 1e-9)
-
-        # Compute cosine similarities (dot product of normalized vectors)
-        similarities = self.embeddings_normalized @ query_normalized
-
-        # Apply level filter if specified
+        # Build filter if level specified
+        query_filter = None
         if level_filter:
-            mask = np.array(
-                [
-                    self.ipc_data.get(code, {}).get("level") == level_filter
-                    for code in self.codes
+            query_filter = Filter(
+                must=[
+                    FieldCondition(
+                        key="level",
+                        match=MatchValue(value=level_filter),
+                    )
                 ]
             )
-            similarities = np.where(mask, similarities, -1.0)
 
-        # Get top-k indices
-        top_indices = np.argsort(similarities)[::-1][:top_k]
+        # Query Qdrant
+        response = await self.qdrant_client.query_points(
+            collection_name=IPC_COLLECTION_NAME,
+            query=query_embedding,
+            query_filter=query_filter,
+            limit=top_k,
+            with_payload=True,
+        )
 
         # Build results
         results: list[IpcSearchResult] = []
-        for idx in top_indices:
-            code = self.codes[idx]
-            score = float(similarities[idx])
-
-            if score < 0:  # Filtered out
-                continue
-
-            ipc_info = self.ipc_data.get(code, {})
+        for point in response.points:
+            payload = point.payload or {}
             results.append(
                 IpcSearchResult(
-                    code=code,
-                    description=ipc_info.get("description", ""),
-                    level=ipc_info.get("level", "unknown"),
-                    score=score,
+                    code=payload.get("code", ""),
+                    description=payload.get("description", ""),
+                    level=payload.get("level", "unknown"),
+                    score=point.score if point.score is not None else 0.0,
                 )
             )
 
@@ -157,14 +131,26 @@ class IpcSearchService:
         combined_query = " ".join(keywords)
         return await self.search(combined_query, top_k=top_k)
 
+    async def close(self) -> None:
+        """Close Qdrant client connection."""
+        await self.qdrant_client.close()
+
 
 # Singleton instance (lazy initialization)
 _ipc_search_service: IpcSearchService | None = None
 
 
-def get_ipc_search_service(api_key: str) -> IpcSearchService:
+def get_ipc_search_service(
+    api_key: str,
+    qdrant_url: str = "http://localhost:6333",
+    qdrant_api_key: str | None = None,
+) -> IpcSearchService:
     """Get or create singleton IpcSearchService instance."""
     global _ipc_search_service
     if _ipc_search_service is None:
-        _ipc_search_service = IpcSearchService(api_key=api_key)
+        _ipc_search_service = IpcSearchService(
+            api_key=api_key,
+            qdrant_url=qdrant_url,
+            qdrant_api_key=qdrant_api_key,
+        )
     return _ipc_search_service

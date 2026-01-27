@@ -25,6 +25,7 @@ from app.services.patent_generator import (
     analyze_document,
     generate_specification,
     PatentSpecificationResult,
+    ClaimItem,
 )
 from app.services.session_store import session_store
 from app.services.pdf_extractor import PyMuPDFExtractor
@@ -278,6 +279,7 @@ async def get_session_status(session_id: str) -> SessionStatusResponse:
         ]
         specification = PatentSpecification(
             title=spec_data["title"],
+            title_en=spec_data.get("title_en", ""),
             technical_field=spec_data["technical_field"],
             background_art=spec_data["background_art"],
             problem_to_solve=spec_data["problem_to_solve"],
@@ -332,6 +334,7 @@ async def chat_refine_specification(request: ChatRequest) -> ChatResponse:
     ]
     current_spec = PatentSpecificationResult(
         title=spec_data["title"],
+        title_en=spec_data.get("title_en", ""),
         technical_field=spec_data["technical_field"],
         background_art=spec_data["background_art"],
         problem_to_solve=spec_data["problem_to_solve"],
@@ -361,6 +364,7 @@ async def chat_refine_specification(request: ChatRequest) -> ChatResponse:
 
         updated_specification = PatentSpecification(
             title=result.updated_specification.title,
+            title_en=result.updated_specification.title_en,
             technical_field=result.updated_specification.technical_field,
             background_art=result.updated_specification.background_art,
             problem_to_solve=result.updated_specification.problem_to_solve,
@@ -434,6 +438,7 @@ async def download_patent_word(session_id: str) -> StreamingResponse:
     ]
     specification = PatentSpecification(
         title=spec_data["title"],
+        title_en=spec_data.get("title_en", ""),
         technical_field=spec_data["technical_field"],
         background_art=spec_data["background_art"],
         problem_to_solve=spec_data["problem_to_solve"],

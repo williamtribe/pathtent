@@ -3,8 +3,6 @@
 Provides endpoints for direct KIPRIS freeSearch API access.
 """
 
-# @TODO-1 — KIPRIS freeSearch wrapper endpoint
-
 import logging
 
 from fastapi import APIRouter, HTTPException
