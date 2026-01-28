@@ -24,18 +24,18 @@ router = APIRouter(tags=["search"])
 @router.post("/search/configure")
 @limiter.limit("20/minute")
 async def configure_search(
-    request: ConfigureSearchRequest, req: Request, _auth: RequireAPIKey
+    body: ConfigureSearchRequest, request: Request, _auth: RequireAPIKey
 ) -> ConfigureSearchResponse:
     """Generate KIPRIS search query using LLM"""
-    query = await generate_search_query(request.text)
+    query = await generate_search_query(body.text)
     return ConfigureSearchResponse(search_query=query)
 
 
 @router.post("/search/request", status_code=201)
 @limiter.limit("10/minute")
 async def request_search(
-    request: SearchRequest,
-    req: Request,
+    body: SearchRequest,
+    request: Request,
     _auth: RequireAPIKey,
     db: AsyncSession = Depends(get_db),
     queries: Queries = Depends(get_pgqueuer_queries),
@@ -43,8 +43,8 @@ async def request_search(
     """Create search and enqueue background processing"""
     search = await create_search(
         session=db,
-        original_text=request.original_text,
-        search_query=request.search_query,
+        original_text=body.original_text,
+        search_query=body.search_query,
     )
     await db.commit()
 
@@ -60,7 +60,7 @@ async def request_search(
 @limiter.limit("60/minute")
 async def get_search_result(
     search_id: UUID,
-    req: Request,
+    request: Request,
     _auth: RequireAPIKey,
     db: AsyncSession = Depends(get_db),
 ) -> SearchStatusResponse:

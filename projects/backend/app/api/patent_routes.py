@@ -63,7 +63,7 @@ router = APIRouter(tags=["patent"])
 @router.post("/patent/analyze", response_model=GenerateResponse)
 @limiter.limit("10/minute")
 async def analyze_research_document(
-    request: AnalyzeRequest, req: Request, _auth: RequireAPIKey
+    body: AnalyzeRequest, request: Request, _auth: RequireAPIKey
 ) -> GenerateResponse:
     """
     연구 논문/보고서 분석 및 초안 명세서 생성.
@@ -72,16 +72,16 @@ async def analyze_research_document(
     반환되는 session_id와 초안 명세서로 AI 챗봇과 대화하며 수정할 수 있습니다.
 
     Args:
-        request: 연구 논문/보고서 텍스트
+        body: 연구 논문/보고서 텍스트
 
     Returns:
         세션 ID, 초안 명세서
     """
-    session = session_store.create(request.text)
+    session = session_store.create(body.text)
 
     try:
         result = await generate_specification(
-            original_text=request.text,
+            original_text=body.text,
             summary="",
             answers={},
         )
@@ -129,7 +129,7 @@ async def analyze_research_document(
 @router.post("/patent/analyze/pdf", response_model=AnalyzeResponse)
 @limiter.limit("10/minute")
 async def analyze_pdf_document(
-    req: Request, _auth: RequireAPIKey, file: UploadFile = File(...)
+    request: Request, _auth: RequireAPIKey, file: UploadFile = File(...)
 ) -> AnalyzeResponse:
     """
     PDF 파일 업로드 및 분석.
@@ -163,7 +163,7 @@ async def analyze_pdf_document(
 
         # Analyze the extracted text (pass through req and _auth for rate limiting/auth)
         analyze_request = AnalyzeRequest(text=text)
-        return await analyze_research_document(analyze_request, req, _auth)
+        return await analyze_research_document(analyze_request, request, _auth)
 
     finally:
         # Cleanup temp file
@@ -173,7 +173,7 @@ async def analyze_pdf_document(
 @router.post("/patent/generate", response_model=GenerateResponse)
 @limiter.limit("10/minute")
 async def generate_patent_specification(
-    request: GenerateRequest, req: Request, _auth: RequireAPIKey
+    body: GenerateRequest, request: Request, _auth: RequireAPIKey
 ) -> GenerateResponse:
     """
     특허 명세서 생성.
@@ -182,13 +182,13 @@ async def generate_patent_specification(
     완전한 특허 명세서를 생성합니다.
 
     Args:
-        request: 세션 ID와 질문 답변 목록
+        body: 세션 ID와 질문 답변 목록
 
     Returns:
         생성된 특허 명세서
     """
     # Get session
-    session = session_store.get(request.session_id)
+    session = session_store.get(body.session_id)
     if not session:
         raise HTTPException(
             status_code=404, detail="세션을 찾을 수 없거나 만료되었습니다."
@@ -201,14 +201,14 @@ async def generate_patent_specification(
         )
 
     # Update session status
-    session_store.update(request.session_id, status="generating")
+    session_store.update(body.session_id, status="generating")
 
     try:
         # Convert answers to dict
-        answers_dict = {a.question_id: a.answer for a in request.answers}
+        answers_dict = {a.question_id: a.answer for a in body.answers}
 
         # Store answers
-        session_store.update(request.session_id, answers=answers_dict)
+        session_store.update(body.session_id, answers=answers_dict)
 
         # Generate specification
         result = await generate_specification(
@@ -243,19 +243,19 @@ async def generate_patent_specification(
 
         # Store result and update status
         session_store.update(
-            request.session_id,
+            body.session_id,
             specification=specification.model_dump(),
             status="completed",
         )
 
         return GenerateResponse(
-            session_id=request.session_id,
+            session_id=body.session_id,
             specification=specification,
         )
 
     except Exception as e:
         logger.exception("명세서 생성 중 오류 발생")
-        session_store.update(request.session_id, status="analyzed")  # Rollback status
+        session_store.update(body.session_id, status="analyzed")  # Rollback status
         raise HTTPException(
             status_code=500, detail="명세서 생성 중 오류가 발생했습니다"
         )
@@ -264,7 +264,7 @@ async def generate_patent_specification(
 @router.get("/patent/session/{session_id}", response_model=SessionStatusResponse)
 @limiter.limit("60/minute")
 async def get_session_status(
-    session_id: str, req: Request, _auth: RequireAPIKey
+    session_id: str, request: Request, _auth: RequireAPIKey
 ) -> SessionStatusResponse:
     """
     세션 상태 조회.
@@ -319,7 +319,7 @@ async def get_session_status(
 @router.post("/patent/chat", response_model=ChatResponse)
 @limiter.limit("20/minute")
 async def chat_refine_specification(
-    request: ChatRequest, req: Request, _auth: RequireAPIKey
+    body: ChatRequest, request: Request, _auth: RequireAPIKey
 ) -> ChatResponse:
     """
     AI 챗봇과 대화하며 명세서 수정.
@@ -327,12 +327,12 @@ async def chat_refine_specification(
     사용자 메시지를 받아 AI가 명세서를 수정하고 응답합니다.
 
     Args:
-        request: 세션 ID와 사용자 메시지
+        body: 세션 ID와 사용자 메시지
 
     Returns:
         AI 응답과 업데이트된 명세서
     """
-    session = session_store.get(request.session_id)
+    session = session_store.get(body.session_id)
     if not session:
         raise HTTPException(
             status_code=404, detail="세션을 찾을 수 없거나 만료되었습니다."
@@ -369,7 +369,7 @@ async def chat_refine_specification(
     try:
         result = await refine_via_chat(
             current_spec=current_spec,
-            user_message=request.message,
+            user_message=body.message,
             chat_history=session.chat_history,
         )
 
@@ -397,18 +397,18 @@ async def chat_refine_specification(
         )
 
         chat_history = session.chat_history + [
-            {"role": "user", "content": request.message},
+            {"role": "user", "content": body.message},
             {"role": "assistant", "content": result.assistant_message},
         ]
 
         session_store.update(
-            request.session_id,
+            body.session_id,
             specification=updated_specification.model_dump(),
             chat_history=chat_history,
         )
 
         return ChatResponse(
-            session_id=request.session_id,
+            session_id=body.session_id,
             message=result.assistant_message,
             specification=updated_specification,
         )
@@ -423,7 +423,7 @@ async def chat_refine_specification(
 @router.get("/patent/download/{session_id}")
 @limiter.limit("10/minute")
 async def download_patent_word(
-    session_id: str, req: Request, _auth: RequireAPIKey
+    session_id: str, request: Request, _auth: RequireAPIKey
 ) -> StreamingResponse:
     """
     특허 명세서 Word 파일 다운로드.
@@ -491,7 +491,7 @@ async def download_patent_word(
 @router.get("/patent/ipc/{application_number}")
 @limiter.limit("30/minute")
 async def get_ipc_codes(
-    application_number: str, req: Request, _auth: RequireAPIKey
+    application_number: str, request: Request, _auth: RequireAPIKey
 ) -> list[IPCInfo]:
     """
     출원번호로 IPC 코드 조회.
@@ -528,7 +528,7 @@ async def get_ipc_codes(
 @limiter.limit("20/minute")
 async def search_patents_by_ipc(
     ipc_number: str,
-    req: Request,
+    request: Request,
     _auth: RequireAPIKey,
     page: int = 1,
     page_size: int = 30,
@@ -600,7 +600,7 @@ async def search_patents_by_ipc(
 @limiter.limit("10/minute")
 async def download_ipc_search_as_excel(
     ipc_number: str,
-    req: Request,
+    request: Request,
     _auth: RequireAPIKey,
     page: int = 1,
     page_size: int = 500,
@@ -674,7 +674,7 @@ async def download_ipc_search_as_excel(
 @limiter.limit("20/minute")
 async def search_patents_free(
     word: str,
-    req: Request,
+    request: Request,
     _auth: RequireAPIKey,
     page: int = 1,
     page_size: int = 30,
@@ -746,7 +746,7 @@ async def search_patents_free(
 @limiter.limit("10/minute")
 async def download_free_search_as_excel(
     word: str,
-    req: Request,
+    request: Request,
     _auth: RequireAPIKey,
     page: int = 1,
     page_size: int = 500,
@@ -820,7 +820,7 @@ async def download_free_search_as_excel(
 @limiter.limit("5/minute")
 async def analyze_sna_free_search(
     word: str,
-    req: Request,
+    request: Request,
     _auth: RequireAPIKey,
     code_length: int = 4,
     page_size: int = 500,
@@ -944,7 +944,7 @@ async def analyze_sna_free_search(
 @limiter.limit("5/minute")
 async def analyze_sna_ipc_search(
     ipc_number: str,
-    req: Request,
+    request: Request,
     _auth: RequireAPIKey,
     code_length: int = 4,
     page_size: int = 500,

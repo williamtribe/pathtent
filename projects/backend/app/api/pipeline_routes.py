@@ -20,7 +20,7 @@ router = APIRouter(tags=["pipeline"])
 @router.post("/analysis/pipeline", response_model=PipelineResponse)
 @limiter.limit("5/minute")
 async def analyze_pipeline(
-    request: PipelineRequest, req: Request, _auth: RequireAPIKey
+    body: PipelineRequest, request: Request, _auth: RequireAPIKey
 ) -> PipelineResponse:
     """Run the unified analysis pipeline.
 
@@ -38,7 +38,7 @@ async def analyze_pipeline(
     Users can optionally provide custom noise_removal_config to override AI-generated settings.
     """
     try:
-        result = await run_pipeline(request)
+        result = await run_pipeline(body)
         return result
     except Exception as e:
         logger.exception("Pipeline failed")

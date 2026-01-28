@@ -49,7 +49,7 @@ class KIPRISSearchResponse(BaseModel):
 )
 @limiter.limit("30/minute")
 async def search_kipris(
-    request: KIPRISSearchRequest, req: Request, _auth: RequireAPIKey
+    body: KIPRISSearchRequest, request: Request, _auth: RequireAPIKey
 ) -> KIPRISSearchResponse:
     """Search KIPRIS using freeSearchInfo API.
 
@@ -75,13 +75,13 @@ async def search_kipris(
     # OR within group, AND between groups
     query_groups = []
 
-    for core_kw in request.keywords[:5]:  # Top 5 core keywords
+    for core_kw in body.keywords[:5]:  # Top 5 core keywords
         cleaned_core = clean_keyword(core_kw)
         if not cleaned_core:
             continue
 
         # Get synonyms for this keyword
-        synonyms = request.synonyms.get(core_kw, [])
+        synonyms = body.synonyms.get(core_kw, [])
 
         # Build group: core + synonyms (OR connected with +)
         group_terms = [cleaned_core]
@@ -112,7 +112,7 @@ async def search_kipris(
             search_params = FreeSearchParams.model_construct(
                 word=search_query,
                 docs_start=1,
-                docs_count=min(request.max_results, 500),
+                docs_count=min(body.max_results, 500),
                 patent=True,
                 utility=True,
             )
@@ -124,11 +124,11 @@ async def search_kipris(
 
             # Collect more pages if needed
             page = 2
-            while collected < request.max_results and collected < total_found:
+            while collected < body.max_results and collected < total_found:
                 search_params = FreeSearchParams.model_construct(
                     word=search_query,
                     docs_start=collected + 1,
-                    docs_count=min(request.max_results - collected, 500),
+                    docs_count=min(body.max_results - collected, 500),
                     patent=True,
                     utility=True,
                 )

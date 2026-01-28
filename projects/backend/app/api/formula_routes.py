@@ -28,7 +28,7 @@ router = APIRouter(tags=["formula"])
 @router.post("/formula/generate", response_model=FormulaResult)
 @limiter.limit("20/minute")
 async def generate_search_formula(
-    request: FormulaGenerateRequest, req: Request, _auth: RequireAPIKey
+    body: FormulaGenerateRequest, request: Request, _auth: RequireAPIKey
 ) -> FormulaResult:
     """
     Generate a KIPRIS search formula from invention description.
@@ -38,8 +38,8 @@ async def generate_search_formula(
     """
     try:
         result = await generate_formula(
-            text=request.text,
-            options=request.options,
+            text=body.text,
+            options=body.options,
         )
         return result
     except Exception as e:
@@ -52,7 +52,7 @@ async def generate_search_formula(
 @router.post("/formula/improve", response_model=FormulaResult)
 @limiter.limit("20/minute")
 async def improve_search_formula(
-    request: FormulaImproveRequest, req: Request, _auth: RequireAPIKey
+    body: FormulaImproveRequest, request: Request, _auth: RequireAPIKey
 ) -> FormulaResult:
     """
     Improve an existing KIPRIS search formula based on feedback.
@@ -63,13 +63,13 @@ async def improve_search_formula(
     """
     try:
         result = await improve_formula(
-            original_formula=request.original_formula,
-            original_keywords=request.original_keywords,
-            original_synonyms=request.original_synonyms,
-            original_excluded_terms=request.original_excluded_terms,
-            feedback=request.feedback,
-            result_count=request.result_count,
-            additional_context=request.additional_context,
+            original_formula=body.original_formula,
+            original_keywords=body.original_keywords,
+            original_synonyms=body.original_synonyms,
+            original_excluded_terms=body.original_excluded_terms,
+            feedback=body.feedback,
+            result_count=body.result_count,
+            additional_context=body.additional_context,
         )
         return result
     except Exception as e:
@@ -82,7 +82,7 @@ async def improve_search_formula(
 @router.post("/formula/generate-blocks", response_model=FormulaBlocksResponse)
 @limiter.limit("20/minute")
 async def generate_search_formula_blocks(
-    request: FormulaGenerateRequest, req: Request, _auth: RequireAPIKey
+    body: FormulaGenerateRequest, request: Request, _auth: RequireAPIKey
 ) -> FormulaBlocksResponse:
     """
     Generate a block-based KIPRIS search formula from invention description.
@@ -92,8 +92,8 @@ async def generate_search_formula_blocks(
     """
     try:
         result = await generate_formula_blocks(
-            text=request.text,
-            options=request.options,
+            text=body.text,
+            options=body.options,
         )
         return result
     except Exception as e:
@@ -106,7 +106,7 @@ async def generate_search_formula_blocks(
 @router.post("/formula/assemble", response_model=FormulaAssembleResponse)
 @limiter.limit("30/minute")
 async def assemble_search_formula(
-    request: FormulaAssembleRequest, req: Request, _auth: RequireAPIKey
+    body: FormulaAssembleRequest, request: Request, _auth: RequireAPIKey
 ) -> FormulaAssembleResponse:
     """
     Assemble a KIPRIS search formula from user-edited blocks.
@@ -116,10 +116,10 @@ async def assemble_search_formula(
     """
     try:
         formula = await assemble_formula_from_blocks(
-            blocks=request.blocks,
-            block_operators=request.block_operators,
-            ipc_codes=request.ipc_codes,
-            excluded_terms=request.excluded_terms,
+            blocks=body.blocks,
+            block_operators=body.block_operators,
+            ipc_codes=body.ipc_codes,
+            excluded_terms=body.excluded_terms,
         )
         return FormulaAssembleResponse(assembled_formula=formula)
     except ValueError as e:

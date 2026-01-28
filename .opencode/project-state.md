@@ -86,6 +86,7 @@
 - [x] Phase 1: CORS & Error Handling
 - [x] Phase 2: Rate Limiting & API Auth
 - [x] Phase 3: Frontend Fixes
+- [x] Fix slowapi parameter naming (req→request, request body→body)
 - [ ] Commit and push to feature/security-hardening
 - [ ] Merge to dev when complete
 

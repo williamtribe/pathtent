@@ -21,7 +21,7 @@ router = APIRouter(tags=["collection"])
 @router.post("/patent/collect", response_model=CollectResponse)
 @limiter.limit("10/minute")
 async def collect_patents_endpoint(
-    request: CollectRequest, req: Request, _auth: RequireAPIKey
+    body: CollectRequest, request: Request, _auth: RequireAPIKey
 ) -> CollectResponse:
     """
     Collect patents from KIPRIS using a search formula.
@@ -31,7 +31,7 @@ async def collect_patents_endpoint(
     Supports pagination up to max_results limit.
     """
     try:
-        result = await collect_patents(request)
+        result = await collect_patents(body)
         return result
     except ValueError as e:
         logger.warning("Patent collection validation error: %s", e)

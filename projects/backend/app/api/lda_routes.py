@@ -19,7 +19,7 @@ router = APIRouter(tags=["analysis"])
 @router.post("/analysis/lda", response_model=LDAResponse)
 @limiter.limit("10/minute")
 async def analyze_lda_endpoint(
-    request: LDARequest, req: Request, _auth: RequireAPIKey
+    body: LDARequest, request: Request, _auth: RequireAPIKey
 ) -> LDAResponse:
     """
     Perform LDA topic modeling on patent texts.
@@ -32,18 +32,18 @@ async def analyze_lda_endpoint(
     quantitative analysis is included in the response.
     """
     try:
-        result = await analyze_lda(request)
+        result = await analyze_lda(body)
 
         # Perform quantitative analysis if metadata is available
         has_metadata = any(
             (isinstance(p, dict) and p.get("metadata"))
             or (not isinstance(p, dict) and p.metadata is not None)
-            for p in request.patents
+            for p in body.patents
         )
 
         if has_metadata:
             quantitative_result = analyze_quantitative(
-                patents=list(request.patents),
+                patents=list(body.patents),
                 topics=result.topics,
                 documents=result.documents,
             )

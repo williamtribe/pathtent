@@ -26,7 +26,7 @@ router = APIRouter(tags=["noise-removal"])
 )
 @limiter.limit("10/minute")
 async def process_noise_removal(
-    request: NoiseRemovalRequest, req: Request, _auth: RequireAPIKey
+    body: NoiseRemovalRequest, request: Request, _auth: RequireAPIKey
 ) -> NoiseRemovalResponse:
     """Process patents through the 2-step noise removal pipeline.
 
@@ -51,8 +51,8 @@ async def process_noise_removal(
         # Process through pipeline
         service = NoiseRemovalService(embedding_service=embedding_service)
         result, excluded_patents = await service.process(
-            patents=request.patents,
-            config=request.config,
+            patents=body.patents,
+            config=body.config,
         )
 
         return NoiseRemovalResponse(
