@@ -506,7 +506,11 @@ async def generate_formula(
     ipc_codes: list[str] = []
     ipc_codes_raw: list[str] = []
     if options is None or options.include_ipc:
-        ipc_service = IpcSearchService(api_key=settings.google_api_key)
+        ipc_service = IpcSearchService(
+            api_key=settings.google_api_key,
+            qdrant_url=settings.qdrant_url,
+            qdrant_api_key=settings.qdrant_api_key,
+        )
         ipc_results = await ipc_service.search(text, top_k=3)
         ipc_codes = [f"{r.code}: {r.description[:50]}..." for r in ipc_results]
         ipc_codes_raw = [r.code.replace(" ", "") for r in ipc_results]
@@ -667,7 +671,11 @@ async def generate_formula_blocks(
 
     ipc_service: IpcSearchService | None = None
     if options is None or options.include_ipc:
-        ipc_service = IpcSearchService(api_key=settings.google_api_key)
+        ipc_service = IpcSearchService(
+            api_key=settings.google_api_key,
+            qdrant_url=settings.qdrant_url,
+            qdrant_api_key=settings.qdrant_api_key,
+        )
 
     for i, category in enumerate(output.categories):
         # Search IPC codes for this category name

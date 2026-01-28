@@ -54,7 +54,9 @@ class IpcSearchService:
             qdrant_api_key: Optional API key for Qdrant Cloud
         """
         self.api_key = api_key
-        self.qdrant_client = AsyncQdrantClient(url=qdrant_url, api_key=qdrant_api_key)
+        self.qdrant_client = AsyncQdrantClient(
+            url=qdrant_url, api_key=qdrant_api_key, timeout=30
+        )
         self.embedding_service = GeminiEmbeddingService(api_key=api_key)
 
     async def search(
