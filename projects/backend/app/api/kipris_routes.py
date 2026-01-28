@@ -105,7 +105,9 @@ async def search_kipris(
         patents: list[FreeSearchResult] = []
         total_found = 0
 
-        async with KIPRISClient(service_key=settings.kipris_service_key) as client:
+        async with KIPRISClient(
+            service_key=settings.kipris_service_key, timeout=60.0
+        ) as client:
             # First page
             from kipris.models import FreeSearchParams
 
