@@ -5,8 +5,10 @@ Provides endpoints for direct KIPRIS freeSearch API access.
 
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
+
+from app.api.dependencies import RequireAPIKey, limiter
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +47,10 @@ class KIPRISSearchResponse(BaseModel):
 @router.post(
     "/kipris/search", response_model=KIPRISSearchResponse, response_model_by_alias=False
 )
-async def search_kipris(request: KIPRISSearchRequest) -> KIPRISSearchResponse:
+@limiter.limit("30/minute")
+async def search_kipris(
+    request: KIPRISSearchRequest, req: Request, _auth: RequireAPIKey
+) -> KIPRISSearchResponse:
     """Search KIPRIS using freeSearchInfo API.
 
     Takes keywords and returns matching patents.
@@ -145,4 +150,7 @@ async def search_kipris(request: KIPRISSearchRequest) -> KIPRISSearchResponse:
         )
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"KIPRIS search failed: {str(e)}")
+        logger.exception("KIPRIS search failed")
+        raise HTTPException(
+            status_code=500, detail="KIPRIS 검색 중 오류가 발생했습니다"
+        )

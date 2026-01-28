@@ -4,8 +4,9 @@ API routes for KIPRIS search formula generation.
 Provides endpoints for generating and improving patent search formulas.
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
+from app.api.dependencies import RequireAPIKey, limiter
 from app.schemas.formula import (
     FormulaAssembleRequest,
     FormulaAssembleResponse,
@@ -25,7 +26,10 @@ router = APIRouter(tags=["formula"])
 
 
 @router.post("/formula/generate", response_model=FormulaResult)
-async def generate_search_formula(request: FormulaGenerateRequest) -> FormulaResult:
+@limiter.limit("20/minute")
+async def generate_search_formula(
+    request: FormulaGenerateRequest, req: Request, _auth: RequireAPIKey
+) -> FormulaResult:
     """
     Generate a KIPRIS search formula from invention description.
 
@@ -46,7 +50,10 @@ async def generate_search_formula(request: FormulaGenerateRequest) -> FormulaRes
 
 
 @router.post("/formula/improve", response_model=FormulaResult)
-async def improve_search_formula(request: FormulaImproveRequest) -> FormulaResult:
+@limiter.limit("20/minute")
+async def improve_search_formula(
+    request: FormulaImproveRequest, req: Request, _auth: RequireAPIKey
+) -> FormulaResult:
     """
     Improve an existing KIPRIS search formula based on feedback.
 
@@ -73,8 +80,9 @@ async def improve_search_formula(request: FormulaImproveRequest) -> FormulaResul
 
 
 @router.post("/formula/generate-blocks", response_model=FormulaBlocksResponse)
+@limiter.limit("20/minute")
 async def generate_search_formula_blocks(
-    request: FormulaGenerateRequest,
+    request: FormulaGenerateRequest, req: Request, _auth: RequireAPIKey
 ) -> FormulaBlocksResponse:
     """
     Generate a block-based KIPRIS search formula from invention description.
@@ -96,8 +104,9 @@ async def generate_search_formula_blocks(
 
 
 @router.post("/formula/assemble", response_model=FormulaAssembleResponse)
+@limiter.limit("30/minute")
 async def assemble_search_formula(
-    request: FormulaAssembleRequest,
+    request: FormulaAssembleRequest, req: Request, _auth: RequireAPIKey
 ) -> FormulaAssembleResponse:
     """
     Assemble a KIPRIS search formula from user-edited blocks.

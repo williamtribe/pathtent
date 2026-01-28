@@ -4,8 +4,11 @@ API routes for LDA topic modeling analysis.
 Provides endpoints for performing LDA analysis on patent texts.
 """
 
-from fastapi import APIRouter, HTTPException
+import logging
 
+from fastapi import APIRouter, HTTPException, Request
+
+from app.api.dependencies import RequireAPIKey, limiter
 from app.schemas.lda import LDARequest, LDAResponse
 from app.services.lda_analyzer import analyze_lda
 from app.services.quantitative import analyze_quantitative
@@ -14,7 +17,10 @@ router = APIRouter(tags=["analysis"])
 
 
 @router.post("/analysis/lda", response_model=LDAResponse)
-async def analyze_lda_endpoint(request: LDARequest) -> LDAResponse:
+@limiter.limit("10/minute")
+async def analyze_lda_endpoint(
+    request: LDARequest, req: Request, _auth: RequireAPIKey
+) -> LDAResponse:
     """
     Perform LDA topic modeling on patent texts.
 
@@ -53,12 +59,14 @@ async def analyze_lda_endpoint(request: LDARequest) -> LDAResponse:
 
         return result
     except ValueError as e:
+        logger.warning("LDA validation error: %s", e)
         raise HTTPException(
             status_code=400,
-            detail=str(e),
+            detail="입력값 검증 오류가 발생했습니다",
         )
     except Exception as e:
+        logger.exception("LDA analysis failed")
         raise HTTPException(
             status_code=500,
-            detail=f"LDA analysis failed: {e!s}",
+            detail="LDA 분석 중 오류가 발생했습니다",
         )

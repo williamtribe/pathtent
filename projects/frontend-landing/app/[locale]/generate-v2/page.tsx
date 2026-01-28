@@ -10,7 +10,7 @@ import {
   Send,
   Sparkles,
 } from 'lucide-react'
-import type { PatentSpecification } from '../../../lib/api'
+import { API_BASE_URL, type PatentSpecification } from '../../../lib/api'
 
 export default function GenerateV2Page() {
   const [step, setStep] = useState<'input' | 'refining'>('input')
@@ -40,7 +40,7 @@ export default function GenerateV2Page() {
     setError(null)
 
     try {
-      const response = await fetch('http://localhost:8000/api/v1/patent/analyze', {
+      const response = await fetch(`${API_BASE_URL}/api/v1/patent/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: inputText }),
@@ -75,7 +75,7 @@ export default function GenerateV2Page() {
     setIsSending(true)
 
     try {
-      const response = await fetch('http://localhost:8000/api/v1/patent/chat', {
+      const response = await fetch(`${API_BASE_URL}/api/v1/patent/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -104,7 +104,7 @@ export default function GenerateV2Page() {
 
     try {
       const response = await fetch(
-        `http://localhost:8000/api/v1/patent/download/${sessionId}`
+        `${API_BASE_URL}/api/v1/patent/download/${sessionId}`
       )
       if (!response.ok) throw new Error('다운로드 실패')
 

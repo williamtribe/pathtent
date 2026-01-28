@@ -1,6 +1,12 @@
 """API routes for noise removal pipeline."""
 
-from fastapi import APIRouter, HTTPException
+import logging
+
+from fastapi import APIRouter, HTTPException, Request
+
+from app.api.dependencies import RequireAPIKey, limiter
+
+logger = logging.getLogger(__name__)
 
 from app.config import Settings
 from app.schemas.noise_removal import (
@@ -18,8 +24,9 @@ router = APIRouter(tags=["noise-removal"])
     response_model=NoiseRemovalResponse,
     response_model_by_alias=False,
 )
+@limiter.limit("10/minute")
 async def process_noise_removal(
-    request: NoiseRemovalRequest,
+    request: NoiseRemovalRequest, req: Request, _auth: RequireAPIKey
 ) -> NoiseRemovalResponse:
     """Process patents through the 2-step noise removal pipeline.
 
@@ -56,6 +63,10 @@ async def process_noise_removal(
     except HTTPException:
         raise
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.warning("Noise removal validation error: %s", e)
+        raise HTTPException(status_code=400, detail="입력값 검증 오류가 발생했습니다")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Noise removal failed: {str(e)}")
+        logger.exception("Noise removal failed")
+        raise HTTPException(
+            status_code=500, detail="노이즈 제거 처리 중 오류가 발생했습니다"
+        )

@@ -1,6 +1,12 @@
 """Patent specification generation API routes."""
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+import logging
+
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
+
+from app.api.dependencies import RequireAPIKey, limiter
+
+logger = logging.getLogger(__name__)
 from fastapi.responses import StreamingResponse
 from pathlib import Path
 import tempfile
@@ -55,7 +61,10 @@ router = APIRouter(tags=["patent"])
 
 
 @router.post("/patent/analyze", response_model=GenerateResponse)
-async def analyze_research_document(request: AnalyzeRequest) -> GenerateResponse:
+@limiter.limit("10/minute")
+async def analyze_research_document(
+    request: AnalyzeRequest, req: Request, _auth: RequireAPIKey
+) -> GenerateResponse:
     """
     연구 논문/보고서 분석 및 초안 명세서 생성.
 
@@ -112,14 +121,16 @@ async def analyze_research_document(request: AnalyzeRequest) -> GenerateResponse
         )
 
     except Exception as e:
+        logger.exception("문서 분석 중 오류 발생")
         session_store.delete(session.id)
-        raise HTTPException(
-            status_code=500, detail=f"명세서 생성 중 오류 발생: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail="문서 분석 중 오류가 발생했습니다")
 
 
 @router.post("/patent/analyze/pdf", response_model=AnalyzeResponse)
-async def analyze_pdf_document(file: UploadFile = File(...)) -> AnalyzeResponse:
+@limiter.limit("10/minute")
+async def analyze_pdf_document(
+    req: Request, _auth: RequireAPIKey, file: UploadFile = File(...)
+) -> AnalyzeResponse:
     """
     PDF 파일 업로드 및 분석.
 
@@ -150,9 +161,9 @@ async def analyze_pdf_document(file: UploadFile = File(...)) -> AnalyzeResponse:
                 status_code=400, detail="PDF에서 충분한 텍스트를 추출할 수 없습니다."
             )
 
-        # Analyze the extracted text
-        request = AnalyzeRequest(text=text)
-        return await analyze_research_document(request)
+        # Analyze the extracted text (pass through req and _auth for rate limiting/auth)
+        analyze_request = AnalyzeRequest(text=text)
+        return await analyze_research_document(analyze_request, req, _auth)
 
     finally:
         # Cleanup temp file
@@ -160,7 +171,10 @@ async def analyze_pdf_document(file: UploadFile = File(...)) -> AnalyzeResponse:
 
 
 @router.post("/patent/generate", response_model=GenerateResponse)
-async def generate_patent_specification(request: GenerateRequest) -> GenerateResponse:
+@limiter.limit("10/minute")
+async def generate_patent_specification(
+    request: GenerateRequest, req: Request, _auth: RequireAPIKey
+) -> GenerateResponse:
     """
     특허 명세서 생성.
 
@@ -240,14 +254,18 @@ async def generate_patent_specification(request: GenerateRequest) -> GenerateRes
         )
 
     except Exception as e:
+        logger.exception("명세서 생성 중 오류 발생")
         session_store.update(request.session_id, status="analyzed")  # Rollback status
         raise HTTPException(
-            status_code=500, detail=f"명세서 생성 중 오류 발생: {str(e)}"
+            status_code=500, detail="명세서 생성 중 오류가 발생했습니다"
         )
 
 
 @router.get("/patent/session/{session_id}", response_model=SessionStatusResponse)
-async def get_session_status(session_id: str) -> SessionStatusResponse:
+@limiter.limit("60/minute")
+async def get_session_status(
+    session_id: str, req: Request, _auth: RequireAPIKey
+) -> SessionStatusResponse:
     """
     세션 상태 조회.
 
@@ -299,7 +317,10 @@ async def get_session_status(session_id: str) -> SessionStatusResponse:
 
 
 @router.post("/patent/chat", response_model=ChatResponse)
-async def chat_refine_specification(request: ChatRequest) -> ChatResponse:
+@limiter.limit("20/minute")
+async def chat_refine_specification(
+    request: ChatRequest, req: Request, _auth: RequireAPIKey
+) -> ChatResponse:
     """
     AI 챗봇과 대화하며 명세서 수정.
 
@@ -393,13 +414,17 @@ async def chat_refine_specification(request: ChatRequest) -> ChatResponse:
         )
 
     except Exception as e:
+        logger.exception("명세서 수정 중 오류 발생")
         raise HTTPException(
-            status_code=500, detail=f"명세서 수정 중 오류 발생: {str(e)}"
+            status_code=500, detail="명세서 수정 중 오류가 발생했습니다"
         )
 
 
 @router.get("/patent/download/{session_id}")
-async def download_patent_word(session_id: str) -> StreamingResponse:
+@limiter.limit("10/minute")
+async def download_patent_word(
+    session_id: str, req: Request, _auth: RequireAPIKey
+) -> StreamingResponse:
     """
     특허 명세서 Word 파일 다운로드.
 
@@ -464,7 +489,10 @@ async def download_patent_word(session_id: str) -> StreamingResponse:
 
 
 @router.get("/patent/ipc/{application_number}")
-async def get_ipc_codes(application_number: str) -> list[IPCInfo]:
+@limiter.limit("30/minute")
+async def get_ipc_codes(
+    application_number: str, req: Request, _auth: RequireAPIKey
+) -> list[IPCInfo]:
     """
     출원번호로 IPC 코드 조회.
 
@@ -492,12 +520,16 @@ async def get_ipc_codes(application_number: str) -> list[IPCInfo]:
                 )
             return ipc_list
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"IPC 조회 중 오류 발생: {str(e)}")
+        logger.exception("IPC 조회 중 오류 발생")
+        raise HTTPException(status_code=500, detail="IPC 조회 중 오류가 발생했습니다")
 
 
 @router.get("/patent/search/ipc")
+@limiter.limit("20/minute")
 async def search_patents_by_ipc(
     ipc_number: str,
+    req: Request,
+    _auth: RequireAPIKey,
     page: int = 1,
     page_size: int = 30,
     patent: bool | None = None,
@@ -560,12 +592,16 @@ async def search_patents_by_ipc(
 
         return result
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"IPC 검색 중 오류 발생: {str(e)}")
+        logger.exception("IPC 검색 중 오류 발생")
+        raise HTTPException(status_code=500, detail="IPC 검색 중 오류가 발생했습니다")
 
 
 @router.get("/patent/search/ipc/excel")
+@limiter.limit("10/minute")
 async def download_ipc_search_as_excel(
     ipc_number: str,
+    req: Request,
+    _auth: RequireAPIKey,
     page: int = 1,
     page_size: int = 500,
     patent: bool | None = None,
@@ -630,12 +666,16 @@ async def download_ipc_search_as_excel(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"엑셀 생성 중 오류 발생: {str(e)}")
+        logger.exception("엑셀 생성 중 오류 발생")
+        raise HTTPException(status_code=500, detail="엑셀 생성 중 오류가 발생했습니다")
 
 
 @router.get("/patent/search/free")
+@limiter.limit("20/minute")
 async def search_patents_free(
     word: str,
+    req: Request,
+    _auth: RequireAPIKey,
     page: int = 1,
     page_size: int = 30,
     patent: bool | None = None,
@@ -698,12 +738,16 @@ async def search_patents_free(
 
         return result
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"자유검색 중 오류 발생: {str(e)}")
+        logger.exception("자유검색 중 오류 발생")
+        raise HTTPException(status_code=500, detail="자유검색 중 오류가 발생했습니다")
 
 
 @router.get("/patent/search/free/excel")
+@limiter.limit("10/minute")
 async def download_free_search_as_excel(
     word: str,
+    req: Request,
+    _auth: RequireAPIKey,
     page: int = 1,
     page_size: int = 500,
     patent: bool | None = None,
@@ -768,12 +812,16 @@ async def download_free_search_as_excel(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"엑셀 생성 중 오류 발생: {str(e)}")
+        logger.exception("엑셀 생성 중 오류 발생")
+        raise HTTPException(status_code=500, detail="엑셀 생성 중 오류가 발생했습니다")
 
 
 @router.get("/patent/sna/free")
+@limiter.limit("5/minute")
 async def analyze_sna_free_search(
     word: str,
+    req: Request,
+    _auth: RequireAPIKey,
     code_length: int = 4,
     page_size: int = 500,
     patent: bool | None = None,
@@ -888,12 +936,16 @@ async def analyze_sna_free_search(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"SNA 분석 중 오류 발생: {str(e)}")
+        logger.exception("SNA 분석 중 오류 발생")
+        raise HTTPException(status_code=500, detail="SNA 분석 중 오류가 발생했습니다")
 
 
 @router.get("/patent/sna/ipc")
+@limiter.limit("5/minute")
 async def analyze_sna_ipc_search(
     ipc_number: str,
+    req: Request,
+    _auth: RequireAPIKey,
     code_length: int = 4,
     page_size: int = 500,
     patent: bool | None = None,
@@ -971,4 +1023,5 @@ async def analyze_sna_ipc_search(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"SNA 분석 중 오류 발생: {str(e)}")
+        logger.exception("SNA 분석 중 오류 발생")
+        raise HTTPException(status_code=500, detail="SNA 분석 중 오류가 발생했습니다")

@@ -39,6 +39,12 @@ class Settings(BaseSettings):
     qdrant_api_key: str | None = None
     qdrant_collection_name: str = "pathtent"
 
+    # API 인증 (선택: 비용이 드는 엔드포인트 보호)
+    api_key: str | None = None
+
+    # Rate limiting (분당 요청 수)
+    rate_limit_per_minute: int = 30
+
     # 기타
     debug: bool = False
 

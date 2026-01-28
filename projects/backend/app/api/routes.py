@@ -1,10 +1,11 @@
 import json
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pgqueuer.queries import Queries
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.dependencies import RequireAPIKey, limiter
 from app.api.deps import get_db, get_pgqueuer_queries
 from app.api.schemas import (
     ConfigureSearchRequest,
@@ -21,8 +22,9 @@ router = APIRouter(tags=["search"])
 
 
 @router.post("/search/configure")
+@limiter.limit("20/minute")
 async def configure_search(
-    request: ConfigureSearchRequest,
+    request: ConfigureSearchRequest, req: Request, _auth: RequireAPIKey
 ) -> ConfigureSearchResponse:
     """Generate KIPRIS search query using LLM"""
     query = await generate_search_query(request.text)
@@ -30,8 +32,11 @@ async def configure_search(
 
 
 @router.post("/search/request", status_code=201)
+@limiter.limit("10/minute")
 async def request_search(
     request: SearchRequest,
+    req: Request,
+    _auth: RequireAPIKey,
     db: AsyncSession = Depends(get_db),
     queries: Queries = Depends(get_pgqueuer_queries),
 ) -> SearchResponse:
@@ -52,8 +57,11 @@ async def request_search(
 
 
 @router.get("/search/{search_id}")
+@limiter.limit("60/minute")
 async def get_search_result(
     search_id: UUID,
+    req: Request,
+    _auth: RequireAPIKey,
     db: AsyncSession = Depends(get_db),
 ) -> SearchStatusResponse:
     """Get search status and results"""

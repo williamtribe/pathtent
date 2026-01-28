@@ -1,9 +1,9 @@
 # Project State
 ## Current Status
 - **Date**: 2026-01-28
-- **Last Action**: Security Screening COMPLETE, session halted
-- **Current Branch**: `feature/ipc-to-qdrant`
-- **Last Commit**: `9bd8127` - feat(backend): migrate IPC search from NPZ to Qdrant
+- **Last Action**: Security Hardening ALL PHASES COMPLETE
+- **Current Branch**: `feature/security-hardening` (from `dev`)
+- **Pending Commit**: All security changes ready to commit
 ---
 ## Deployment Status
 ### URLs
@@ -25,25 +25,50 @@
 - Sanity checked: proper clustering, good diversity
 - Backend tested and working
 ---
-## Security Screening ✅ COMPLETE
-### Issues Found (for future hardening)
-| Issue | Location | Priority |
-|-------|----------|----------|
-| CORS wildcard (`allow_methods=["*"]`) | `backend/app/main.py:29` | Medium |
-| No rate limiting | Backend-wide | Medium |
-| No auth on endpoints | Backend-wide | High (before prod) |
-| Error details exposed via `str(e)` | 11+ route handlers | Low |
-| Hardcoded localhost URLs | `frontend/generate-v2/page.tsx:43,78,107` | Low |
-| No security headers (CSP, HSTS) | `next.config.mjs` | Low |
-| XSS payloads accepted in forms | Frontend forms | Low (React escapes) |
+## Security Hardening Progress ✅ ALL COMPLETE
+### Phase 1: CORS & Error Handling ✅ COMPLETE
+| Change | Files | Status |
+|--------|-------|--------|
+| CORS tightened | `main.py` - explicit methods/headers | ✅ Done |
+| Logging added | 6 route files | ✅ Done |
+| Error sanitization | 16 handlers - generic messages | ✅ Done |
+
+**Details:**
+- `allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]`
+- `allow_headers=["Content-Type", "Authorization", "X-API-Key", "Accept"]`
+- All `str(e)` patterns replaced with `logger.exception()` + generic Korean messages
+
+### Phase 2: Rate Limiting & API Auth ✅ COMPLETE
+| Change | Files | Status |
+|--------|-------|--------|
+| slowapi dependency | `pyproject.toml` | ✅ Done |
+| Rate limiter middleware | `main.py` | ✅ Done |
+| API key auth dependency | `dependencies.py` (NEW) | ✅ Done |
+| Config settings | `config.py` - api_key, rate_limit_per_minute | ✅ Done |
+| All endpoints protected | 8 route files | ✅ Done |
+
+**Details:**
+- New `dependencies.py` with `limiter` instance and `verify_api_key` function
+- All endpoints have `@limiter.limit("X/minute")` + `RequireAPIKey` dependency
+- Rate limits: 5-60/min depending on endpoint cost
+- API key optional in dev (if API_KEY not set), required in prod
+
+### Phase 3: Frontend Fixes ✅ COMPLETE
+| Change | Files | Status |
+|--------|-------|--------|
+| Hardcoded URLs fixed | `generate-v2/page.tsx` | ✅ Done |
+| API_BASE_URL exported | `lib/api.ts` | ✅ Done |
+| Security headers added | `next.config.mjs` | ✅ Done |
+| Middleware → Proxy migration | `middleware.ts` → `proxy.ts` | ✅ Done |
+
+**Details:**
+- All fetch calls now use `${API_BASE_URL}/api/v1/...`
+- Headers: X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy
+- Renamed middleware.ts to proxy.ts per Next.js 16 deprecation
 
 ### Current Mitigation
 - API keys manually redacted when not in use
 - PostgreSQL URL secured within Railway internal network
-- No CRUD/auth implemented yet, so most issues deferred
-
-### Status
-Safe for development/testing. Address before restoring API keys for production.
 ---
 ## Recent Decisions (2026-01-28)
 ### Embedding Dimension: 768
@@ -57,17 +82,18 @@ Safe for development/testing. Address before restoring API keys for production.
 - Tracked for future cleanup
 ---
 ## Next Steps (Priority Order)
-### 1. CI/CD Setup (GitHub Actions)
+### 1. Commit Security Hardening
+- [x] Phase 1: CORS & Error Handling
+- [x] Phase 2: Rate Limiting & API Auth
+- [x] Phase 3: Frontend Fixes
+- [ ] Commit and push to feature/security-hardening
+- [ ] Merge to dev when complete
+
+### 2. CI/CD Setup (GitHub Actions)
 - Type checking (TypeScript, basedpyright)
 - Linting (ESLint, Ruff)
 - Build verification
 - Auto-deploy OFF (manual deployment preferred)
-
-### 2. Security Hardening (Before Production)
-- Tighten CORS to specific origins
-- Add rate limiting middleware
-- Implement API authentication
-- Add security headers to Next.js
 
 ### 3. Production IPC Upload
 - Run upload script against Railway Qdrant

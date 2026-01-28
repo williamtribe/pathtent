@@ -26,6 +26,7 @@ dependencies = [
     "scikit-learn>=1.6.0",
     "gensim>=4.3.0",
     "numpy>=2.0.0",
+    "slowapi>=0.1.9",
 ]
 
 [dependency-groups]
