@@ -82,13 +82,13 @@
 - Tracked for future cleanup
 ---
 ## Next Steps (Priority Order)
-### 1. Commit Security Hardening
+### 1. Commit Security Hardening ✅ COMPLETE
 - [x] Phase 1: CORS & Error Handling
 - [x] Phase 2: Rate Limiting & API Auth
 - [x] Phase 3: Frontend Fixes
 - [x] Fix slowapi parameter naming (req→request, request body→body)
-- [ ] Commit and push to feature/security-hardening
-- [ ] Merge to dev when complete
+- [x] Commit and push to feature/security-hardening (5221bcd)
+- [ ] Merge to dev when ready
 
 ### 2. CI/CD Setup (GitHub Actions)
 - Type checking (TypeScript, basedpyright)
