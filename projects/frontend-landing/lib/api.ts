@@ -5,7 +5,7 @@
 // Mock mode for frontend UI testing without backend
 const MOCK_MODE = false
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 // ============================================================================
 // Types

@@ -3,12 +3,12 @@
 Provides endpoints for direct KIPRIS freeSearch API access.
 """
 
-# @TODO-1 — KIPRIS freeSearch wrapper endpoint
-
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
+
+from app.api.dependencies import RequireAPIKey, limiter
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +47,10 @@ class KIPRISSearchResponse(BaseModel):
 @router.post(
     "/kipris/search", response_model=KIPRISSearchResponse, response_model_by_alias=False
 )
-async def search_kipris(request: KIPRISSearchRequest) -> KIPRISSearchResponse:
+@limiter.limit("30/minute")
+async def search_kipris(
+    body: KIPRISSearchRequest, request: Request, _auth: RequireAPIKey
+) -> KIPRISSearchResponse:
     """Search KIPRIS using freeSearchInfo API.
 
     Takes keywords and returns matching patents.
@@ -72,13 +75,13 @@ async def search_kipris(request: KIPRISSearchRequest) -> KIPRISSearchResponse:
     # OR within group, AND between groups
     query_groups = []
 
-    for core_kw in request.keywords[:5]:  # Top 5 core keywords
+    for core_kw in body.keywords[:5]:  # Top 5 core keywords
         cleaned_core = clean_keyword(core_kw)
         if not cleaned_core:
             continue
 
         # Get synonyms for this keyword
-        synonyms = request.synonyms.get(core_kw, [])
+        synonyms = body.synonyms.get(core_kw, [])
 
         # Build group: core + synonyms (OR connected with +)
         group_terms = [cleaned_core]
@@ -109,7 +112,7 @@ async def search_kipris(request: KIPRISSearchRequest) -> KIPRISSearchResponse:
             search_params = FreeSearchParams.model_construct(
                 word=search_query,
                 docs_start=1,
-                docs_count=min(request.max_results, 500),
+                docs_count=min(body.max_results, 500),
                 patent=True,
                 utility=True,
             )
@@ -121,11 +124,11 @@ async def search_kipris(request: KIPRISSearchRequest) -> KIPRISSearchResponse:
 
             # Collect more pages if needed
             page = 2
-            while collected < request.max_results and collected < total_found:
+            while collected < body.max_results and collected < total_found:
                 search_params = FreeSearchParams.model_construct(
                     word=search_query,
                     docs_start=collected + 1,
-                    docs_count=min(request.max_results - collected, 500),
+                    docs_count=min(body.max_results - collected, 500),
                     patent=True,
                     utility=True,
                 )
@@ -147,4 +150,7 @@ async def search_kipris(request: KIPRISSearchRequest) -> KIPRISSearchResponse:
         )
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"KIPRIS search failed: {str(e)}")
+        logger.exception("KIPRIS search failed")
+        raise HTTPException(
+            status_code=500, detail="KIPRIS 검색 중 오류가 발생했습니다"
+        )

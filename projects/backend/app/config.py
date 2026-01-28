@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     google_api_key: str | None = None
     gemini_model: str = "gemini-2.0-flash-exp"
     gemini_embedding_model: str = "gemini-embedding-001"
+    # Embedding dimension: 768 (reduced from 3072 for storage efficiency at scale)
+    # Gemini supports output_dimensionality: 768, 1536, or 3072
+    embedding_dimension: int = 768
 
     # Anthropic (Claude) - Default provider
     anthropic_api_key: str | None = None
@@ -28,12 +31,19 @@ class Settings(BaseSettings):
 
     # 선택: Vector DB (특허 검색 기능 사용 시)
     vector_db_mode: str = "qdrant"
+    # Must match embedding_dimension above for consistency
     vector_db_dimension: int = 768
     pinecone_api_key: str | None = None
     pinecone_index_name: str | None = None
     qdrant_url: str = "http://localhost:6333"
     qdrant_api_key: str | None = None
     qdrant_collection_name: str = "pathtent"
+
+    # API 인증 (선택: 비용이 드는 엔드포인트 보호)
+    api_key: str | None = None
+
+    # Rate limiting (분당 요청 수)
+    rate_limit_per_minute: int = 30
 
     # 기타
     debug: bool = False

@@ -37,8 +37,20 @@ npm install && npm run dev    # http://localhost:3000
 cd projects/backend
 uv sync
 docker compose up -d          # PostgreSQL, Qdrant
+
+# Database 마이그레이션
 uv run alembic upgrade head
+
+# IPC 임베딩 생성 및 업로드 (일회성)
+export GOOGLE_API_KEY=your_google_api_key
+uv run python scripts/build_ipc_embeddings.py
+uv run python scripts/upload_ipc_to_qdrant.py
+
+# API 서버 시작 (터미널 1)
 uv run uvicorn app.main:app --reload   # http://localhost:8000
+
+# 백그라운드 워커 시작 (터미널 2)
+uv run python -m app.run_worker
 ```
 
 ### 크롬 확장
@@ -51,17 +63,28 @@ npm install && npm run dev
 ## 환경 변수 (백엔드)
 
 ```bash
-DATABASE_URL=postgresql+asyncpg://user:pass@localhost:5432/pathtent
+# 데이터베이스
+DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/pathtent
+
+# KIPRIS API
 KIPRIS_SERVICE_KEY=your_kipris_key
+
+# Google Gemini API
 GOOGLE_API_KEY=your_google_key
+
+# 벡터 데이터베이스
 VECTOR_DB_MODE=qdrant
+VECTOR_DB_DIMENSION=768
 QDRANT_URL=http://localhost:6333
+QDRANT_COLLECTION_NAME=pathtent
+QDRANT_IPC_COLLECTION_NAME=ipc_codes
 ```
 
 ## 문서
 
 - `AGENTS.md` - 개발 가이드라인 (에이전트용)
-- `docs/ARCHITECTURE.md` - 시스템 아키텍처
+- `docs/ARCHITECTURE.md` - 시스템 아키텍처 및 IPC 임베딩 설정
+- `projects/backend/README.md` - 백엔드 API 상세 가이드
 - `PROJECT_OVERVIEW_KO.md` - 상세 프로젝트 개요
 
 ## 라이선스

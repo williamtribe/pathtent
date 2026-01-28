@@ -25,6 +25,7 @@ from google import genai
 load_dotenv(Path(__file__).parent.parent / ".env")
 
 EMBEDDING_MODEL = os.environ.get("GEMINI_EMBEDDING_MODEL", "gemini-embedding-001")
+EMBEDDING_DIMENSION = 768  # Reduced from 3072 for storage efficiency
 BATCH_SIZE = 100  # Gemini max
 RATE_LIMIT = 40  # req/sec
 CHECKPOINT_INTERVAL = 10  # batches
@@ -88,7 +89,7 @@ def main():
 
     remaining = total - start_idx
     num_batches = (remaining + BATCH_SIZE - 1) // BATCH_SIZE
-    print(f"Model: {EMBEDDING_MODEL}")
+    print(f"Model: {EMBEDDING_MODEL} (dim={EMBEDDING_DIMENSION})")
     print(f"Total: {total}, Remaining: {remaining}")
     print(f"Batches: {num_batches} x {BATCH_SIZE} items")
     print(f"Rate: {RATE_LIMIT}/sec, ETA: ~{num_batches / RATE_LIMIT:.1f}s (optimistic)")
@@ -165,9 +166,22 @@ def main():
         print("Removed checkpoint")
 
 
+def _normalize_embedding(embedding: list[float]) -> list[float]:
+    """L2 normalize embedding vector for reduced dimensionality."""
+    vec = np.array(embedding, dtype=np.float32)
+    norm = np.linalg.norm(vec)
+    if norm > 0:
+        vec = vec / norm
+    return vec.tolist()
+
+
 def _embed_batch_sync(client: genai.Client, texts: list[str]) -> list[list[float]]:
-    """Synchronous batch embedding. Raises on any error."""
-    result = client.models.embed_content(model=EMBEDDING_MODEL, contents=texts)
+    """Synchronous batch embedding with 768-dim output. Raises on any error."""
+    result = client.models.embed_content(
+        model=EMBEDDING_MODEL,
+        contents=texts,
+        config={"output_dimensionality": EMBEDDING_DIMENSION},
+    )
 
     if not result.embeddings:
         raise ValueError(f"Empty embeddings for batch of {len(texts)}")
@@ -181,7 +195,8 @@ def _embed_batch_sync(client: genai.Client, texts: list[str]) -> list[list[float
     for i, emb in enumerate(result.embeddings):
         if not emb.values:
             raise ValueError(f"Empty embedding at index {i}")
-        embeddings.append(list(emb.values))
+        # L2 normalize for reduced dimensionality
+        embeddings.append(_normalize_embedding(list(emb.values)))
 
     return embeddings
 

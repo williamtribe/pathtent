@@ -1,6 +1,12 @@
 """Patent specification generation API routes."""
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+import logging
+
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
+
+from app.api.dependencies import RequireAPIKey, limiter
+
+logger = logging.getLogger(__name__)
 from fastapi.responses import StreamingResponse
 from pathlib import Path
 import tempfile
@@ -25,6 +31,7 @@ from app.services.patent_generator import (
     analyze_document,
     generate_specification,
     PatentSpecificationResult,
+    ClaimItem,
 )
 from app.services.session_store import session_store
 from app.services.pdf_extractor import PyMuPDFExtractor
@@ -54,7 +61,10 @@ router = APIRouter(tags=["patent"])
 
 
 @router.post("/patent/analyze", response_model=GenerateResponse)
-async def analyze_research_document(request: AnalyzeRequest) -> GenerateResponse:
+@limiter.limit("10/minute")
+async def analyze_research_document(
+    body: AnalyzeRequest, request: Request, _auth: RequireAPIKey
+) -> GenerateResponse:
     """
     연구 논문/보고서 분석 및 초안 명세서 생성.
 
@@ -62,16 +72,16 @@ async def analyze_research_document(request: AnalyzeRequest) -> GenerateResponse
     반환되는 session_id와 초안 명세서로 AI 챗봇과 대화하며 수정할 수 있습니다.
 
     Args:
-        request: 연구 논문/보고서 텍스트
+        body: 연구 논문/보고서 텍스트
 
     Returns:
         세션 ID, 초안 명세서
     """
-    session = session_store.create(request.text)
+    session = session_store.create(body.text)
 
     try:
         result = await generate_specification(
-            original_text=request.text,
+            original_text=body.text,
             summary="",
             answers={},
         )
@@ -111,14 +121,16 @@ async def analyze_research_document(request: AnalyzeRequest) -> GenerateResponse
         )
 
     except Exception as e:
+        logger.exception("문서 분석 중 오류 발생")
         session_store.delete(session.id)
-        raise HTTPException(
-            status_code=500, detail=f"명세서 생성 중 오류 발생: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail="문서 분석 중 오류가 발생했습니다")
 
 
 @router.post("/patent/analyze/pdf", response_model=AnalyzeResponse)
-async def analyze_pdf_document(file: UploadFile = File(...)) -> AnalyzeResponse:
+@limiter.limit("10/minute")
+async def analyze_pdf_document(
+    request: Request, _auth: RequireAPIKey, file: UploadFile = File(...)
+) -> AnalyzeResponse:
     """
     PDF 파일 업로드 및 분석.
 
@@ -149,9 +161,9 @@ async def analyze_pdf_document(file: UploadFile = File(...)) -> AnalyzeResponse:
                 status_code=400, detail="PDF에서 충분한 텍스트를 추출할 수 없습니다."
             )
 
-        # Analyze the extracted text
-        request = AnalyzeRequest(text=text)
-        return await analyze_research_document(request)
+        # Analyze the extracted text (pass through req and _auth for rate limiting/auth)
+        analyze_request = AnalyzeRequest(text=text)
+        return await analyze_research_document(analyze_request, request, _auth)
 
     finally:
         # Cleanup temp file
@@ -159,7 +171,10 @@ async def analyze_pdf_document(file: UploadFile = File(...)) -> AnalyzeResponse:
 
 
 @router.post("/patent/generate", response_model=GenerateResponse)
-async def generate_patent_specification(request: GenerateRequest) -> GenerateResponse:
+@limiter.limit("10/minute")
+async def generate_patent_specification(
+    body: GenerateRequest, request: Request, _auth: RequireAPIKey
+) -> GenerateResponse:
     """
     특허 명세서 생성.
 
@@ -167,13 +182,13 @@ async def generate_patent_specification(request: GenerateRequest) -> GenerateRes
     완전한 특허 명세서를 생성합니다.
 
     Args:
-        request: 세션 ID와 질문 답변 목록
+        body: 세션 ID와 질문 답변 목록
 
     Returns:
         생성된 특허 명세서
     """
     # Get session
-    session = session_store.get(request.session_id)
+    session = session_store.get(body.session_id)
     if not session:
         raise HTTPException(
             status_code=404, detail="세션을 찾을 수 없거나 만료되었습니다."
@@ -186,14 +201,14 @@ async def generate_patent_specification(request: GenerateRequest) -> GenerateRes
         )
 
     # Update session status
-    session_store.update(request.session_id, status="generating")
+    session_store.update(body.session_id, status="generating")
 
     try:
         # Convert answers to dict
-        answers_dict = {a.question_id: a.answer for a in request.answers}
+        answers_dict = {a.question_id: a.answer for a in body.answers}
 
         # Store answers
-        session_store.update(request.session_id, answers=answers_dict)
+        session_store.update(body.session_id, answers=answers_dict)
 
         # Generate specification
         result = await generate_specification(
@@ -228,25 +243,29 @@ async def generate_patent_specification(request: GenerateRequest) -> GenerateRes
 
         # Store result and update status
         session_store.update(
-            request.session_id,
+            body.session_id,
             specification=specification.model_dump(),
             status="completed",
         )
 
         return GenerateResponse(
-            session_id=request.session_id,
+            session_id=body.session_id,
             specification=specification,
         )
 
     except Exception as e:
-        session_store.update(request.session_id, status="analyzed")  # Rollback status
+        logger.exception("명세서 생성 중 오류 발생")
+        session_store.update(body.session_id, status="analyzed")  # Rollback status
         raise HTTPException(
-            status_code=500, detail=f"명세서 생성 중 오류 발생: {str(e)}"
+            status_code=500, detail="명세서 생성 중 오류가 발생했습니다"
         )
 
 
 @router.get("/patent/session/{session_id}", response_model=SessionStatusResponse)
-async def get_session_status(session_id: str) -> SessionStatusResponse:
+@limiter.limit("60/minute")
+async def get_session_status(
+    session_id: str, request: Request, _auth: RequireAPIKey
+) -> SessionStatusResponse:
     """
     세션 상태 조회.
 
@@ -278,6 +297,7 @@ async def get_session_status(session_id: str) -> SessionStatusResponse:
         ]
         specification = PatentSpecification(
             title=spec_data["title"],
+            title_en=spec_data.get("title_en", ""),
             technical_field=spec_data["technical_field"],
             background_art=spec_data["background_art"],
             problem_to_solve=spec_data["problem_to_solve"],
@@ -297,19 +317,22 @@ async def get_session_status(session_id: str) -> SessionStatusResponse:
 
 
 @router.post("/patent/chat", response_model=ChatResponse)
-async def chat_refine_specification(request: ChatRequest) -> ChatResponse:
+@limiter.limit("20/minute")
+async def chat_refine_specification(
+    body: ChatRequest, request: Request, _auth: RequireAPIKey
+) -> ChatResponse:
     """
     AI 챗봇과 대화하며 명세서 수정.
 
     사용자 메시지를 받아 AI가 명세서를 수정하고 응답합니다.
 
     Args:
-        request: 세션 ID와 사용자 메시지
+        body: 세션 ID와 사용자 메시지
 
     Returns:
         AI 응답과 업데이트된 명세서
     """
-    session = session_store.get(request.session_id)
+    session = session_store.get(body.session_id)
     if not session:
         raise HTTPException(
             status_code=404, detail="세션을 찾을 수 없거나 만료되었습니다."
@@ -332,6 +355,7 @@ async def chat_refine_specification(request: ChatRequest) -> ChatResponse:
     ]
     current_spec = PatentSpecificationResult(
         title=spec_data["title"],
+        title_en=spec_data.get("title_en", ""),
         technical_field=spec_data["technical_field"],
         background_art=spec_data["background_art"],
         problem_to_solve=spec_data["problem_to_solve"],
@@ -345,7 +369,7 @@ async def chat_refine_specification(request: ChatRequest) -> ChatResponse:
     try:
         result = await refine_via_chat(
             current_spec=current_spec,
-            user_message=request.message,
+            user_message=body.message,
             chat_history=session.chat_history,
         )
 
@@ -361,6 +385,7 @@ async def chat_refine_specification(request: ChatRequest) -> ChatResponse:
 
         updated_specification = PatentSpecification(
             title=result.updated_specification.title,
+            title_en=result.updated_specification.title_en,
             technical_field=result.updated_specification.technical_field,
             background_art=result.updated_specification.background_art,
             problem_to_solve=result.updated_specification.problem_to_solve,
@@ -372,30 +397,34 @@ async def chat_refine_specification(request: ChatRequest) -> ChatResponse:
         )
 
         chat_history = session.chat_history + [
-            {"role": "user", "content": request.message},
+            {"role": "user", "content": body.message},
             {"role": "assistant", "content": result.assistant_message},
         ]
 
         session_store.update(
-            request.session_id,
+            body.session_id,
             specification=updated_specification.model_dump(),
             chat_history=chat_history,
         )
 
         return ChatResponse(
-            session_id=request.session_id,
+            session_id=body.session_id,
             message=result.assistant_message,
             specification=updated_specification,
         )
 
     except Exception as e:
+        logger.exception("명세서 수정 중 오류 발생")
         raise HTTPException(
-            status_code=500, detail=f"명세서 수정 중 오류 발생: {str(e)}"
+            status_code=500, detail="명세서 수정 중 오류가 발생했습니다"
         )
 
 
 @router.get("/patent/download/{session_id}")
-async def download_patent_word(session_id: str) -> StreamingResponse:
+@limiter.limit("10/minute")
+async def download_patent_word(
+    session_id: str, request: Request, _auth: RequireAPIKey
+) -> StreamingResponse:
     """
     특허 명세서 Word 파일 다운로드.
 
@@ -434,6 +463,7 @@ async def download_patent_word(session_id: str) -> StreamingResponse:
     ]
     specification = PatentSpecification(
         title=spec_data["title"],
+        title_en=spec_data.get("title_en", ""),
         technical_field=spec_data["technical_field"],
         background_art=spec_data["background_art"],
         problem_to_solve=spec_data["problem_to_solve"],
@@ -459,7 +489,10 @@ async def download_patent_word(session_id: str) -> StreamingResponse:
 
 
 @router.get("/patent/ipc/{application_number}")
-async def get_ipc_codes(application_number: str) -> list[IPCInfo]:
+@limiter.limit("30/minute")
+async def get_ipc_codes(
+    application_number: str, request: Request, _auth: RequireAPIKey
+) -> list[IPCInfo]:
     """
     출원번호로 IPC 코드 조회.
 
@@ -487,12 +520,16 @@ async def get_ipc_codes(application_number: str) -> list[IPCInfo]:
                 )
             return ipc_list
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"IPC 조회 중 오류 발생: {str(e)}")
+        logger.exception("IPC 조회 중 오류 발생")
+        raise HTTPException(status_code=500, detail="IPC 조회 중 오류가 발생했습니다")
 
 
 @router.get("/patent/search/ipc")
+@limiter.limit("20/minute")
 async def search_patents_by_ipc(
     ipc_number: str,
+    request: Request,
+    _auth: RequireAPIKey,
     page: int = 1,
     page_size: int = 30,
     patent: bool | None = None,
@@ -555,12 +592,16 @@ async def search_patents_by_ipc(
 
         return result
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"IPC 검색 중 오류 발생: {str(e)}")
+        logger.exception("IPC 검색 중 오류 발생")
+        raise HTTPException(status_code=500, detail="IPC 검색 중 오류가 발생했습니다")
 
 
 @router.get("/patent/search/ipc/excel")
+@limiter.limit("10/minute")
 async def download_ipc_search_as_excel(
     ipc_number: str,
+    request: Request,
+    _auth: RequireAPIKey,
     page: int = 1,
     page_size: int = 500,
     patent: bool | None = None,
@@ -625,12 +666,16 @@ async def download_ipc_search_as_excel(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"엑셀 생성 중 오류 발생: {str(e)}")
+        logger.exception("엑셀 생성 중 오류 발생")
+        raise HTTPException(status_code=500, detail="엑셀 생성 중 오류가 발생했습니다")
 
 
 @router.get("/patent/search/free")
+@limiter.limit("20/minute")
 async def search_patents_free(
     word: str,
+    request: Request,
+    _auth: RequireAPIKey,
     page: int = 1,
     page_size: int = 30,
     patent: bool | None = None,
@@ -693,12 +738,16 @@ async def search_patents_free(
 
         return result
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"자유검색 중 오류 발생: {str(e)}")
+        logger.exception("자유검색 중 오류 발생")
+        raise HTTPException(status_code=500, detail="자유검색 중 오류가 발생했습니다")
 
 
 @router.get("/patent/search/free/excel")
+@limiter.limit("10/minute")
 async def download_free_search_as_excel(
     word: str,
+    request: Request,
+    _auth: RequireAPIKey,
     page: int = 1,
     page_size: int = 500,
     patent: bool | None = None,
@@ -763,12 +812,16 @@ async def download_free_search_as_excel(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"엑셀 생성 중 오류 발생: {str(e)}")
+        logger.exception("엑셀 생성 중 오류 발생")
+        raise HTTPException(status_code=500, detail="엑셀 생성 중 오류가 발생했습니다")
 
 
 @router.get("/patent/sna/free")
+@limiter.limit("5/minute")
 async def analyze_sna_free_search(
     word: str,
+    request: Request,
+    _auth: RequireAPIKey,
     code_length: int = 4,
     page_size: int = 500,
     patent: bool | None = None,
@@ -883,12 +936,16 @@ async def analyze_sna_free_search(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"SNA 분석 중 오류 발생: {str(e)}")
+        logger.exception("SNA 분석 중 오류 발생")
+        raise HTTPException(status_code=500, detail="SNA 분석 중 오류가 발생했습니다")
 
 
 @router.get("/patent/sna/ipc")
+@limiter.limit("5/minute")
 async def analyze_sna_ipc_search(
     ipc_number: str,
+    request: Request,
+    _auth: RequireAPIKey,
     code_length: int = 4,
     page_size: int = 500,
     patent: bool | None = None,
@@ -966,4 +1023,5 @@ async def analyze_sna_ipc_search(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"SNA 분석 중 오류 발생: {str(e)}")
+        logger.exception("SNA 분석 중 오류 발생")
+        raise HTTPException(status_code=500, detail="SNA 분석 중 오류가 발생했습니다")

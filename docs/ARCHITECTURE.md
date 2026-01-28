@@ -446,11 +446,13 @@ mindmap
     AI/ML
       Pydantic AI
       Gemini 3 Flash
-      Gemini embedding-001
+      Gemini embedding-001 (768-dim)
       tiktoken
     Vector DB
       Pinecone cloud
       Qdrant local/cloud
+      pathtent collection
+      ipc_codes collection
     PDF Processing
       PyMuPDF fitz
     External API
@@ -567,9 +569,11 @@ GEMINI_EMBEDDING_MODEL=models/embedding-001
 VECTOR_DB_MODE=qdrant  # or "pinecone"
 VECTOR_DB_DIMENSION=768
 
-# Qdrant (local)
+# Qdrant (local/cloud)
 QDRANT_URL=http://localhost:6333
-QDRANT_COLLECTION_NAME=pathtent
+QDRANT_API_KEY=optional_api_key_for_cloud  # Only needed for Qdrant Cloud
+QDRANT_COLLECTION_NAME=pathtent  # Patent similarity search
+QDRANT_IPC_COLLECTION_NAME=ipc_codes  # IPC code semantic search
 
 # Pinecone (cloud)
 PINECONE_API_KEY=your_pinecone_key
@@ -577,6 +581,102 @@ PINECONE_INDEX_NAME=pathtent
 
 # Debug
 DEBUG=false
+```
+
+---
+
+## IPC Code Embeddings & Vector Collections
+
+### IPC Codes Overview
+
+IPC (International Patent Classification) codes are standardized hierarchical codes used to classify patent inventions. PATHTENT uses semantic embeddings to enable fast IPC code search and matching.
+
+### Vector Collections
+
+| Collection | Purpose | Dimensions | Indexed | Use Case |
+|-----------|---------|-----------|---------|----------|
+| `pathtent` | Patent claims semantic similarity | 768 | Yes | Find similar patents based on claims text |
+| `ipc_codes` | IPC code semantic search | 768 | Yes | Search IPC codes by description |
+
+### Embedding Standardization
+
+- **Dimension**: 768 (reduced from 3072 for storage efficiency)
+- **Model**: Google Gemini `embedding-001`
+- **Normalization**: L2 normalization applied to all embeddings
+- **Token Limit**: Max 2048 tokens per document
+
+### IPC Setup Process
+
+#### 1. Generate IPC Embeddings (768-dim, L2-normalized)
+
+```bash
+cd projects/backend
+uv run python scripts/build_ipc_embeddings.py
+```
+
+**Output**: `data/ipc_embeddings.npz`
+- Contains IPC code descriptions as 768-dimensional normalized vectors
+- Auto-generated from KIPRIS IPC reference data
+
+#### 2. Upload to Qdrant
+
+```bash
+cd projects/backend
+uv run python scripts/upload_ipc_to_qdrant.py
+```
+
+**Actions**:
+- Creates `ipc_codes` collection in Qdrant if not exists
+- Uploads all IPC embeddings from `data/ipc_embeddings.npz`
+- Sets up index with HNSW algorithm for fast search
+- Configures L2 distance metric
+
+#### 3. Verify Upload
+
+```bash
+# Query Qdrant directly
+curl http://localhost:6333/collections/ipc_codes
+
+# Expected response: collection info with point count
+```
+
+### IPC Search Query Flow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant API as FastAPI
+    participant Gemini
+    participant Qdrant
+
+    User->>API: POST /search/ipc {text}
+    API->>Gemini: Embed IPC query text
+    Gemini-->>API: embedding[] (768-dim, L2-normalized)
+    API->>Qdrant: Search collection:ipc_codes
+    Qdrant-->>API: Top-K similar IPC codes
+    API-->>User: {ipc_matches: [...]}
+```
+
+### Local Development: Complete IPC Setup
+
+```bash
+# 1. Start Qdrant container
+docker run -p 6333:6333 qdrant/qdrant
+
+# 2. Setup backend
+cd projects/backend
+uv sync
+export QDRANT_URL=http://localhost:6333
+
+# 3. Generate embeddings (requires GOOGLE_API_KEY)
+export GOOGLE_API_KEY=your_key
+uv run python scripts/build_ipc_embeddings.py
+
+# 4. Upload to Qdrant
+uv run python scripts/upload_ipc_to_qdrant.py
+
+# 5. Verify collections exist
+curl http://localhost:6333/collections
 ```
 
 ---
@@ -625,10 +725,15 @@ uv run alembic upgrade head
 # 4. Initialize pgqueuer
 uv run pgqueuer install
 
-# 5. Start API server
+# 5. Generate & upload IPC embeddings (one-time setup)
+export GOOGLE_API_KEY=your_google_api_key
+uv run python scripts/build_ipc_embeddings.py
+uv run python scripts/upload_ipc_to_qdrant.py
+
+# 6. Start API server
 uv run uvicorn app.main:app --reload
 
-# 6. Start worker (separate terminal)
+# 7. Start worker (separate terminal)
 uv run python -m app.run_worker
 ```
 

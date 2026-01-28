@@ -3,7 +3,13 @@
 Single endpoint for: Natural Language → Search → Noise Removal → LDA
 """
 
-from fastapi import APIRouter, HTTPException
+import logging
+
+from fastapi import APIRouter, HTTPException, Request
+
+from app.api.dependencies import RequireAPIKey, limiter
+
+logger = logging.getLogger(__name__)
 
 from app.schemas.pipeline import PipelineRequest, PipelineResponse
 from app.services.pipeline import run_pipeline
@@ -12,7 +18,10 @@ router = APIRouter(tags=["pipeline"])
 
 
 @router.post("/analysis/pipeline", response_model=PipelineResponse)
-async def analyze_pipeline(request: PipelineRequest) -> PipelineResponse:
+@limiter.limit("5/minute")
+async def analyze_pipeline(
+    body: PipelineRequest, request: Request, _auth: RequireAPIKey
+) -> PipelineResponse:
     """Run the unified analysis pipeline.
 
     This endpoint orchestrates the entire analysis flow:
@@ -29,7 +38,10 @@ async def analyze_pipeline(request: PipelineRequest) -> PipelineResponse:
     Users can optionally provide custom noise_removal_config to override AI-generated settings.
     """
     try:
-        result = await run_pipeline(request)
+        result = await run_pipeline(body)
         return result
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Pipeline failed: {str(e)}")
+        logger.exception("Pipeline failed")
+        raise HTTPException(
+            status_code=500, detail="파이프라인 처리 중 오류가 발생했습니다"
+        )
