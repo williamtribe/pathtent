@@ -42,7 +42,7 @@ class QdrantVectorDB:
         """
         self.collection_name = collection_name
         self.dimension = dimension
-        self.client = AsyncQdrantClient(url=url, api_key=api_key)
+        self.client = AsyncQdrantClient(url=url, api_key=api_key, timeout=30)
         self._initialized = False
 
     async def _ensure_collection(self) -> None:

@@ -116,6 +116,12 @@ test-results/
 .cache/
 
 # ===================
+# AI/Agent Tools
+# ===================
+.opencode/
+.Claude/
+
+# ===================
 # Data Files (regenerated via scripts)
 # ===================
 # IPC embeddings - regenerate with: uv run python scripts/build_ipc_embeddings.py

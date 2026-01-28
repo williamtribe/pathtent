@@ -1,16 +1,8 @@
 #!/usr/bin/env python3
 """
-Upload IPC embeddings to Qdrant vector database.
+Upload IPC embeddings to Qdrant using direct HTTP API calls.
 
-Reads pre-computed embeddings from ipc_embeddings.npz and uploads them
-to a dedicated Qdrant collection for semantic IPC code search.
-
-Usage:
-    uv run python scripts/upload_ipc_to_qdrant.py
-
-Environment variables:
-    QDRANT_URL: Qdrant server URL (default: http://localhost:6333)
-    QDRANT_API_KEY: Optional API key for Qdrant Cloud
+Workaround for QdrantClient timeout issues on Windows.
 """
 
 import json
@@ -18,11 +10,9 @@ import os
 import sys
 from pathlib import Path
 
+import httpx
 import numpy as np
 from dotenv import load_dotenv
-from qdrant_client import QdrantClient
-from qdrant_client.http.exceptions import UnexpectedResponse
-from qdrant_client.models import Distance, PointStruct, VectorParams
 
 load_dotenv(Path(__file__).parent.parent / ".env")
 
@@ -31,7 +21,14 @@ QDRANT_URL = os.environ.get("QDRANT_URL", "http://localhost:6333")
 QDRANT_API_KEY = os.environ.get("QDRANT_API_KEY")
 IPC_COLLECTION_NAME = "ipc_codes"
 EMBEDDING_DIMENSION = 768
-BATCH_SIZE = 100  # Qdrant upsert batch size
+BATCH_SIZE = 100
+
+
+def get_headers() -> dict:
+    headers = {"Content-Type": "application/json"}
+    if QDRANT_API_KEY:
+        headers["api-key"] = QDRANT_API_KEY
+    return headers
 
 
 def main() -> None:
@@ -43,7 +40,6 @@ def main() -> None:
     # Validate files exist
     if not embeddings_path.exists():
         print(f"Error: {embeddings_path} not found")
-        print("Run build_ipc_embeddings.py first to generate embeddings")
         sys.exit(1)
 
     if not ipc_json_path.exists():
@@ -55,15 +51,6 @@ def main() -> None:
     npz_data = np.load(embeddings_path, allow_pickle=True)
     embeddings: np.ndarray = npz_data["embeddings"]
     codes: list[str] = npz_data["codes"].tolist()
-
-    # Validate dimensions
-    if embeddings.shape[1] != EMBEDDING_DIMENSION:
-        print(f"Error: Embedding dimension mismatch!")
-        print(f"  Expected: {EMBEDDING_DIMENSION}")
-        print(f"  Got: {embeddings.shape[1]}")
-        print("Re-run build_ipc_embeddings.py to regenerate 768-dim embeddings")
-        sys.exit(1)
-
     print(f"  Shape: {embeddings.shape}")
     print(f"  Codes: {len(codes)}")
 
@@ -72,33 +59,36 @@ def main() -> None:
     with open(ipc_json_path, encoding="utf-8") as f:
         ipc_data: dict = json.load(f)
 
-    # Connect to Qdrant
-    print(f"Connecting to Qdrant at {QDRANT_URL}...")
-    client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY, timeout=60)
+    # Create HTTP client with longer timeout
+    client = httpx.Client(base_url=QDRANT_URL, headers=get_headers(), timeout=120.0)
 
-    # Create or recreate collection
-    print(f"Creating collection '{IPC_COLLECTION_NAME}'...")
+    print(f"Connecting to Qdrant at {QDRANT_URL}...")
+
+    # Check if collection exists
+    print(f"Checking collection '{IPC_COLLECTION_NAME}'...")
     try:
-        # Check if collection exists
-        existing = client.get_collection(IPC_COLLECTION_NAME)
-        if existing:
-            print(f"  Collection exists with {existing.points_count} points")
+        r = client.get(f"/collections/{IPC_COLLECTION_NAME}")
+        if r.status_code == 200:
+            info = r.json()
+            points_count = info.get("result", {}).get("points_count", 0)
+            print(f"  Collection exists with {points_count} points")
             response = input("  Delete and recreate? [y/N]: ")
             if response.lower() != "y":
                 print("Aborted.")
                 return
-            client.delete_collection(IPC_COLLECTION_NAME)
+            # Delete collection
+            client.delete(f"/collections/{IPC_COLLECTION_NAME}")
             print("  Deleted existing collection")
-    except (UnexpectedResponse, Exception):
+    except Exception:
         pass  # Collection doesn't exist
 
-    client.create_collection(
-        collection_name=IPC_COLLECTION_NAME,
-        vectors_config=VectorParams(
-            size=EMBEDDING_DIMENSION,
-            distance=Distance.COSINE,
-        ),
-    )
+    # Create collection
+    print(f"Creating collection '{IPC_COLLECTION_NAME}'...")
+    create_payload = {"vectors": {"size": EMBEDDING_DIMENSION, "distance": "Cosine"}}
+    r = client.put(f"/collections/{IPC_COLLECTION_NAME}", json=create_payload)
+    if r.status_code not in (200, 201):
+        print(f"Error creating collection: {r.status_code} {r.text}")
+        sys.exit(1)
     print(
         f"  Created collection with {EMBEDDING_DIMENSION}-dim vectors, cosine distance"
     )
@@ -114,53 +104,55 @@ def main() -> None:
 
         points = []
         for i, (code, embedding) in enumerate(zip(batch_codes, batch_embeddings)):
-            # Get metadata from IPC data
             ipc_info = ipc_data.get(code, {})
-
             points.append(
-                PointStruct(
-                    id=batch_start + i,  # Sequential integer ID
-                    vector=embedding.tolist(),
-                    payload={
+                {
+                    "id": batch_start + i,
+                    "vector": embedding.tolist(),
+                    "payload": {
                         "code": code,
                         "description": ipc_info.get("description", ""),
                         "level": ipc_info.get("level", "unknown"),
                         "parent_code": ipc_info.get("parent_code"),
                     },
-                )
+                }
             )
 
-        client.upsert(
-            collection_name=IPC_COLLECTION_NAME,
-            points=points,
+        upsert_payload = {"points": points}
+        r = client.put(
+            f"/collections/{IPC_COLLECTION_NAME}/points", json=upsert_payload
         )
+        if r.status_code not in (200, 201):
+            print(f"Error upserting batch: {r.status_code} {r.text}")
+            sys.exit(1)
 
         pct = batch_end / total * 100
         print(f"  {batch_end}/{total} ({pct:.1f}%)")
 
     # Verify
-    collection_info = client.get_collection(IPC_COLLECTION_NAME)
-    print(
-        f"\nDone! Collection '{IPC_COLLECTION_NAME}' has {collection_info.points_count} points"
-    )
+    r = client.get(f"/collections/{IPC_COLLECTION_NAME}")
+    info = r.json()
+    points_count = info.get("result", {}).get("points_count", 0)
+    print(f"\nDone! Collection '{IPC_COLLECTION_NAME}' has {points_count} points")
 
     # Test query
     print("\nTesting similarity search...")
     test_embedding = embeddings[0].tolist()
-    results = client.query_points(
-        collection_name=IPC_COLLECTION_NAME,
-        query=test_embedding,
-        limit=3,
-        with_payload=True,
+    search_payload = {"vector": test_embedding, "limit": 3, "with_payload": True}
+    r = client.post(
+        f"/collections/{IPC_COLLECTION_NAME}/points/search", json=search_payload
     )
-    print(f"  Query for '{codes[0]}' returned:")
-    for point in results.points:
-        payload = point.payload or {}
-        print(
-            f"    - {payload.get('code')}: {payload.get('description', '')[:50]}... (score: {point.score:.4f})"
-        )
+    if r.status_code == 200:
+        results = r.json().get("result", [])
+        print(f"  Query for '{codes[0]}' returned:")
+        for point in results:
+            payload = point.get("payload", {})
+            desc = payload.get("description", "")[:50]
+            score = point.get("score", 0)
+            print(f"    - {payload.get('code')}: {desc}... (score: {score:.4f})")
 
     client.close()
+    print("\nUpload complete!")
 
 
 if __name__ == "__main__":
