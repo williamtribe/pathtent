@@ -250,3 +250,70 @@ async def generate_specification(
     agent = _PatentAgentSingleton.get()
     result = await agent.run(prompt)
     return result.output
+
+
+from collections.abc import AsyncIterator
+from pydantic import ValidationError
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+async def generate_specification_stream(
+    original_text: str,
+    summary: str,
+    answers: dict[str, str],
+) -> AsyncIterator[dict]:
+    """
+    Generate patent specification with streaming updates.
+
+    Yields partial specification as it's being generated.
+    """
+    answers_text = "\n".join([f"- {qid}: {answer}" for qid, answer in answers.items()])
+
+    prompt = f"""
+다음 연구 내용과 추가 정보를 바탕으로 특허 명세서를 작성하세요.
+
+## 연구 내용 요약
+{summary}
+
+## 원본 연구 내용
+{original_text}
+
+## 추가 답변 정보
+{answers_text}
+
+위 정보를 종합하여 완전한 한국 특허 명세서를 작성하세요.
+"""
+
+    agent = _PatentAgentSingleton.get()
+
+    try:
+        async with agent.run_stream(prompt) as result:
+            chunk_count = 0
+            final_output = None
+
+            # stream_output() yields partial validated outputs for structured data
+            async for partial_output in result.stream_output(debounce_by=0.5):
+                chunk_count += 1
+                final_output = partial_output
+                logger.info(f"Chunk {chunk_count}: title={getattr(partial_output, 'title', 'N/A')}")
+                yield {
+                    "type": "partial",
+                    "data": partial_output.model_dump(),
+                    "done": False,
+                }
+
+            # Use the last yielded output as the final result
+            if final_output is not None:
+                logger.info(f"Streaming complete, got final result: {final_output.title}")
+                yield {"type": "complete", "data": final_output.model_dump(), "done": True}
+            else:
+                # Fallback to result.output if no partial outputs were received
+                final_result = result.output
+                logger.info(f"Using result.output: {final_result.title}")
+                yield {"type": "complete", "data": final_result.model_dump(), "done": True}
+
+    except Exception as e:
+        logger.error(f"Error in generate_specification_stream: {e}", exc_info=True)
+        raise

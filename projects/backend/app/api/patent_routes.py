@@ -1,5 +1,6 @@
 """Patent specification generation API routes."""
 
+import json
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
@@ -30,6 +31,7 @@ from app.api.patent_schemas import (
 from app.services.patent_generator import (
     analyze_document,
     generate_specification,
+    generate_specification_stream,
     PatentSpecificationResult,
     ClaimItem,
 )
@@ -124,6 +126,80 @@ async def analyze_research_document(
         logger.exception("문서 분석 중 오류 발생")
         session_store.delete(session.id)
         raise HTTPException(status_code=500, detail="문서 분석 중 오류가 발생했습니다")
+
+
+@router.post("/patent/analyze/stream")
+@limiter.limit("10/minute")
+async def analyze_research_document_stream(
+    body: AnalyzeRequest, request: Request, _auth: RequireAPIKey
+) -> StreamingResponse:
+    """
+    연구 논문/보고서 분석 및 초안 명세서 생성 (스트리밍).
+
+    SSE(Server-Sent Events)로 생성 진행 상황을 실시간 전송합니다.
+    """
+    session = session_store.create(body.text)
+    logger.info(f"Created session: {session.id}")
+
+    async def event_generator():
+        try:
+            yield f"data: {json.dumps({'type': 'start', 'session_id': session.id})}\n\n"
+            logger.info("Sent start event")
+
+            async for update in generate_specification_stream(
+                original_text=body.text,
+                summary="",
+                answers={},
+            ):
+                logger.info(f"Received update: {update['type']}")
+                if update["type"] == "partial":
+                    yield f"data: {json.dumps({'type': 'progress', 'data': update['data']})}\n\n"
+                elif update["type"] == "complete":
+                    result = update["data"]
+                    logger.info(f"Processing complete result: {result.get('title', 'no title')}")
+                    claims = [
+                        Claim(
+                            number=c["number"],
+                            text=c["text"],
+                            is_independent=c["is_independent"],
+                            depends_on=c.get("depends_on"),
+                        ).model_dump()
+                        for c in result.get("claims", [])
+                    ]
+                    specification = PatentSpecification(
+                        title=result["title"],
+                        title_en=result["title_en"],
+                        technical_field=result["technical_field"],
+                        background_art=result["background_art"],
+                        problem_to_solve=result["problem_to_solve"],
+                        solution=result["solution"],
+                        advantageous_effects=result["advantageous_effects"],
+                        detailed_description=result["detailed_description"],
+                        claims=[Claim(**c) for c in claims],
+                        abstract=result["abstract"],
+                    )
+                    session_store.update(
+                        session.id,
+                        specification=specification.model_dump(),
+                        status="completed",
+                    )
+                    logger.info("Sending complete event")
+                    yield f"data: {json.dumps({'type': 'complete', 'session_id': session.id, 'specification': specification.model_dump()})}\n\n"
+
+        except Exception as e:
+            logger.error(f"Error in event_generator: {e}", exc_info=True)
+            session_store.delete(session.id)
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.post("/patent/analyze/pdf", response_model=AnalyzeResponse)

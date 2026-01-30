@@ -26,13 +26,19 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# CORS configuration - frontend URL can be added via environment variable
+# CORS configuration - frontend URLs can be added via environment variable
 allowed_origins = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "https://pathtent.ai",
+    "https://www.pathtent.ai",
 ]
+# Additional origins from environment variable (comma-separated)
 if frontend_url := os.getenv("FRONTEND_URL"):
-    allowed_origins.append(frontend_url)
+    for url in frontend_url.split(","):
+        url = url.strip()
+        if url and url not in allowed_origins:
+            allowed_origins.append(url)
 
 app.add_middleware(
     CORSMiddleware,
